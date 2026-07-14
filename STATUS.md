@@ -3,9 +3,13 @@
 > Session ritual (HANDOFF §0): read this file → `make gate` on a clean tree →
 > continue from "Next actions."
 
-- **Phase:** 0 — RECONNAISSANCE & SPEC (exit gate NOT yet passed)
-- **Milestone:** recon filed (5 notes, `docs/notes/`); `CLAIMS.md` v0 +
-  `THREAT_MODEL.md` v1 drafted
+- **Phase:** 1 — DESIGN (ADRs). **Phase-0 exit gate PASSED 2026-07-14**,
+  tagged `phase-0`.
+- **Milestone:** Phase 0 complete — recon (5 notes), `CLAIMS.md` v0,
+  `THREAT_MODEL.md` v1 (14 adversaries, both audits harvested), `BENCH.md`
+  (thresholds signed), upstream note (paste-ready). Exit gate: claims+sources
+  ✓ / threat model reviewed ✓ / bakeoff approved (signed) ✓ / go-no-go
+  explicit ✓.
 - **Last green commit:** `make gate` green (scaffold checks; the real gate
   grows fmt/clippy/tests/equality-invariant as crates land)
 
@@ -48,15 +52,26 @@ the SP1-path pairing story).
 
 ## Next actions
 
-1. **Phase-0 exit review** against the HANDOFF exit gate — all four criteria
-   now met: claims specified with sources ✓ / threat model reviewed (both
-   audit PDFs read + harvested) ✓ / bakeoff spec approved (thresholds SIGNED) ✓
-   / go-no-go criteria explicit ✓. Ready to declare the gate passed and tag.
-2. **Tag `phase-0`**, then open Phase 1 (ADR-000 naming sweep, ADR-001
-   skeleton awaiting M0 numbers, ADR-002 recursion, ADR-003 codec, ADR-004
-   reproducible builds, ADR-005 checkpoint-source trait).
-3. **File the upstream note** as a Sextant issue (within-org; tracked as the
-   first cross-repo artifact).
+**Phase 1 — DESIGN (ADRs).** Non-gated design work proceeds autonomously; the
+two human touchpoints are flagged as such.
+
+1. **ADR-000** — ecosystem/naming availability sweep (crates.io `hg-*` / npm
+   `@heliograph` / GH org / ENS-if-relevant); pure research, unblocks crate
+   naming for the workspace.
+2. **ADR-002 / ADR-003 / ADR-004 / ADR-005** — recursion architecture,
+   canonical journal codec, reproducible-build path, checkpoint-source trait.
+   Draftable now from the recon; each cites its notes.
+3. **ADR-001 (zkVM vendor selection)** — SKELETON only. The DECISION section is a
+   **§9 human gate** and awaits M0 numbers; Phase 1 writes the criteria +
+   bakeoff-wiring, not the choice.
+
+### Human touchpoints (not blocking the above)
+
+- **Upstream note filing is a §9 gate.** `docs/notes/sextant-upstream-needs.md`
+  is paste-ready, but filing it on the Sextant repo is "public beyond the
+  created repo" — needs a human go. Held.
+- **`{{PROVER_BUDGET}}`** — required only before any PAID proving run
+  (§9 gate 4). Local/CI runs proceed without it.
 
 ## HANDOFF §12 items — status after the 2026-07-14 human greenlight
 
