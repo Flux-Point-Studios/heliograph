@@ -3,13 +3,12 @@
 > Session ritual (HANDOFF §0): read this file → `make gate` on a clean tree →
 > continue from "Next actions."
 
-- **Phase:** 1 — DESIGN (ADRs). **Phase-0 exit gate PASSED 2026-07-14**,
-  tagged `phase-0`.
-- **Milestone:** Phase 0 complete — recon (5 notes), `CLAIMS.md` v0,
-  `THREAT_MODEL.md` v1 (14 adversaries, both audits harvested), `BENCH.md`
-  (thresholds signed), upstream note (paste-ready). Exit gate: claims+sources
-  ✓ / threat model reviewed ✓ / bakeoff approved (signed) ✓ / go-no-go
-  explicit ✓.
+- **Phase:** 2 — BUILD (M0 bakeoff next). **Phase-1 exit gate PASSED
+  2026-07-14**, tagged `phase-1` (Phase-0 also passed + tagged `phase-0`).
+- **Milestone:** Phase 1 complete — ADR-000..005 + 3 design sketches, earned
+  through an adversarial consistency review (1 blocker + 5 majors + 3 minors
+  found and fixed before tagging). Phase 0: recon, CLAIMS v0, THREAT_MODEL v1
+  (14 adversaries), BENCH (thresholds signed).
 - **Last green commit:** `make gate` green (scaffold checks; the real gate
   grows fmt/clippy/tests/equality-invariant as crates land)
 
@@ -79,11 +78,30 @@ the SP1-path pairing story).
   contract interface (857 lines, thin router over untouched vendor verifier),
   test strategy (625 lines, all 40 ledger rows wired to gate/CI/release).
 
-### Phase-1 exit gate — remaining
+### Phase-1 exit gate — PASSED (2026-07-14), tagged `phase-1`
 
 ADRs ✓ / `hg-claims` API sketch ✓ / contract interface sketch ✓ / test
-strategy ✓. **Ready for exit review** → tag `phase-1` → Phase 2 (M0 bakeoff).
-M0 is the first thing that needs a vendor path built (both arms until ADR-001).
+strategy ✓. Earned via an adversarial 4-lens consistency review (not
+self-declared) — found 1 blocker + 5 majors + 3 minors, all fixed before the tag:
+
+- **BLOCKER** — the router's strict-monotonic-`tip_epoch` extension rule would
+  reject ~765 of every 766 legitimate same-epoch extensions (mainnet emits ~765
+  CardanoTransactions certs/epoch, ~1 boundary crossing), breaking the ~10-min
+  tip-freshness path ADR-002 exists to serve. Fix: `chain_length`+1 is the sole
+  strict-progress key (monotone by construction, both shapes); `tip_epoch`
+  NON-DECREASING; `minProgress` keyed on `ctx_block_number`, not epoch/slot.
+- Majors: rejection journals could be stored as live checkpoints (added the
+  `verdict==0` storing gate + `RejectedCheckpointNotStorable`); §7 wasn't the
+  "complete" error set it claimed (added `ZeroMinProgress`/`ZeroTimelockDelay`/
+  `UnsupportedNetwork`); ADR-005 "byte-identical" vs ADR-003 D5's STM-specific
+  AVK preimage (resolved: S5 is the source-invariant Mithril-protocol AVK root);
+  `verifyClaim` NatSpec "reverts on R8" (R8 never reverts — rejections return);
+  phantom `slot` in the checkpoint progress rule (struck — no slot field).
+- Minors: 154→209 byte heading; R6 uniform-on-rejection clarity; nr_leaves
+  justification.
+
+Next: Phase 2 — **M0 bakeoff** (the first thing needing a vendor path built;
+both SP1 and RISC Zero arms until ADR-001 is decided on M0 numbers).
 
 ### Human touchpoints (not blocking)
 

@@ -407,9 +407,14 @@ interface IHeliographRouter {
     ///         claim_version in accepted set, DRAFT 0 rejected (R2); claim_type ==
     ///         0x0001 && network_id == configured (R3); genesis_vkey == registry
     ///         anchor for the network (R4); imageId in registry (R5); band/presence
-    ///         validity (R7); read verdict (R8). Installing a base checkpoint is
-    ///         itself governed — see `baseInstallAuthority` in §8; it is NOT a plain
-    ///         permissionless append, because it does not chain onto stored state.
+    ///         validity (R7); read verdict (R8). STORING GATE: H5 verdict MUST be 0
+    ///         before any ledger write — a nonzero verdict is a valid proof of a
+    ///         Mithril-chain REJECTION, and installing one as a live checkpoint would
+    ///         make a proof-of-rejection the tip all downstream reads anchor against
+    ///         (RejectedCheckpointNotStorable; ADR-002 D4 "stores the latest PROVEN
+    ///         checkpoint"; T-A8-4). Installing a base checkpoint is itself governed —
+    ///         see `baseInstallAuthority` in §8; it is NOT a plain permissionless
+    ///         append, because it does not chain onto stored state.
     /// @param imageId  Guest image ID; router checks it against the registry (R5),
     ///                  then passes it to the verifier (A3). NOT caller-trusted.
     /// @param journal  The exact hg-claims journal buffer (one buffer, no re-encode
@@ -431,15 +436,33 @@ interface IHeliographRouter {
     ///           - journal.prev_tip_hash (E3) MUST equal the stored checkpoint's
     ///             tip_hash (StaleAnchor otherwise — the A10 old-checkpoint
     ///             regression defense; T-A10-1).
-    ///           - the new state's tip_epoch MUST be strictly monotonic over the
-    ///             stored tip_epoch (NonMonotonicEpoch otherwise).
+    ///           - STORING GATE: H5 verdict MUST be 0 before the ledger write — a
+    ///             journaled REJECTION (nonzero verdict) is a valid proof and passes
+    ///             R1..R7, but must never be stored as a live checkpoint
+    ///             (RejectedCheckpointNotStorable; T-A8-4).
     ///           - chain_length MUST equal stored chain_length + 1 (extend-BY-ONE,
-    ///             CLAIMS §3.2; BadChainLength otherwise).
-    ///           - MINIMUM-PROGRESS RULE (A13, MANDATORY): the extension MUST
-    ///             advance the tip by at least `minProgress` (BelowMinProgress
-    ///             otherwise). This closes the valid-proof front-run that stalls
-    ///             progress (Blobstream0 V-BLOB-VUL-001; T-A13-1). The numeric
-    ///             minProgress is a deploy-time param sized after M0 latency.
+    ///             CLAIMS §3.2; BadChainLength otherwise). This IS the strict-progress
+    ///             key: every extension is prev+1 (CLAIMS §3.2, E5-E17), so
+    ///             chain_length is strictly monotone BY CONSTRUCTION for BOTH
+    ///             extension shapes — no separate strict-epoch rule is needed.
+    ///           - tip_epoch MUST be NON-DECREASING over the stored tip_epoch
+    ///             (EpochRegression otherwise) — NOT strictly increasing. A same-epoch
+    ///             extension (AVK unchanged, tip_epoch CONSTANT, mithril.rs:298-308)
+    ///             is the DOMINANT case: mainnet emits ~765 CardanoTransactions certs
+    ///             per 5-day epoch vs ~1 epoch-boundary crossing
+    ///             (mithril-recursion-watch §3), and intra-epoch tip freshness (~10 min)
+    ///             is the exact liveness path ADR-002 serves. A strict rule would
+    ///             reject ~765 of every 766 legitimate extensions; only a strictly
+    ///             DECREASING epoch is a regression.
+    ///           - MINIMUM-PROGRESS RULE (A13, MANDATORY): the extension MUST advance
+    ///             `ctx_block_number` by at least `minProgress` (BelowMinProgress
+    ///             otherwise). Keyed on ctx_block_number, NOT epoch/slot, because the
+    ///             dominant same-epoch extension advances block height within a
+    ///             CONSTANT epoch (a front-run that does not advance the block is the
+    ///             attack). Requires has_certified_transactions == 1 on both states.
+    ///             This closes the valid-proof front-run that stalls progress
+    ///             (Blobstream0 V-BLOB-VUL-001; T-A13-1). The numeric minProgress is
+    ///             a deploy-time param sized after M0 latency.
     /// @return nonce   The new ledger index (stored + 1). Consumers reference it.
     function submitExtension(bytes32 imageId, bytes calldata journal, bytes calldata seal)
         external
@@ -458,9 +481,11 @@ interface IHeliographRouter {
     ///         that checkpoint; NoCertifiedTxSet otherwise). Mode 2 is rejected here
     ///         (composed anchors are the offline path). 0x0003 has no Mithril anchor
     ///         (CLAIMS §3.3) — it is verified and evented as not-canonical-alone.
-    ///         Reverts on any R1..R8 failure; on success emits ClaimVerified and, if
-    ///         verdict != 0, the journaled rejection is returned (a valid proof of a
-    ///         rejection, NOT a proof of negation — CLAIMS §4.3).
+    ///         Reverts on any R1..R7 failure; R8 (read H5) NEVER reverts — a nonzero
+    ///         verdict is a journaled rejection that is RETURNED, not reverted (a valid
+    ///         proof of a rejection, NOT a proof of negation — CLAIMS §4.3). verifyClaim
+    ///         is a READ (non-storing), so unlike the two storing paths it has no
+    ///         verdict==0 gate. On success emits ClaimVerified.
     /// @param anchorNonce  Ledger index of the checkpoint this claim anchors to
     ///                     (domain = checkpointNonce). Ignored for 0x0003.
     /// @return verdict     The journaled H5 verdict code (0 = accepted).
@@ -610,9 +635,10 @@ interface IHeliographErrors {
     // ── Contract-side checkpoint chaining (ADR-002 D4; A10/A13) ────────────────
     error AnchorModeUnsupported(uint8 mode);   // router accepts mode 1 only; mode 2 is offline (D4)
     error StaleAnchor(bytes32 prevTipHash, bytes32 headTipHash); // prev_tip_hash ≠ head (A10/T-A10-1)
-    error NonMonotonicEpoch(uint64 got, uint64 head);           // tip_epoch not strictly increasing (A10)
-    error BadChainLength(uint32 got, uint32 expected);          // chain_length ≠ head+1 (extend-by-one, CLAIMS §3.2)
-    error BelowMinProgress(uint64 advance, uint64 minProgress); // minimum-progress rule (A13/T-A13-1, MANDATORY)
+    error EpochRegression(uint64 got, uint64 head);             // tip_epoch strictly DECREASED (non-decreasing rule; same-epoch is valid) (A10)
+    error BadChainLength(uint32 got, uint32 expected);          // chain_length ≠ head+1 (extend-by-one, THE strict-progress key, CLAIMS §3.2)
+    error BelowMinProgress(uint64 advance, uint64 minProgress); // ctx_block_number advance < minProgress (A13/T-A13-1, MANDATORY)
+    error RejectedCheckpointNotStorable(uint16 verdict);        // H5 verdict != 0 on a storing path — a proof-of-rejection may not become a live checkpoint (A8/T-A8-4)
     error NoCertifiedTxSet(uint64 anchorNonce);                 // anchor checkpoint has_certified_transactions == 0 (0x0004/0x0005)
     error UnknownCheckpoint(uint64 nonce);                      // anchorNonce/read of a never-appended nonce
 
@@ -626,9 +652,21 @@ interface IHeliographErrors {
     error ProposalCancelled(bytes32 proposalId);   // execute a cancelled proposal
     error DuplicateProposal(bytes32 proposalId);   // propose an already-pending change (salt collision guard)
     error ZeroImageId();                           // reject adding the zero image id (footgun guard)
-    error ZeroGenesisAnchor();                     // reject setting a zero genesis anchor
+    error ZeroGenesisAnchor();                     // reject setting/deploying a zero genesis anchor (registry AND deploy)
+
+    // ── Deploy-time (constructor) guards (§8; A14 T-A14-1/3, A8) ───────────────
+    error ZeroMinProgress();                       // minProgress == 0 defeats the A13 front-run defense
+    error ZeroTimelockDelay();                     // timelockDelay == 0 is an instant admin (A8 anti-pattern)
+    error UnsupportedNetwork(uint32 networkId);    // networkId ∉ {mainnet, preprod, preview} (A2 network magic)
 }
 ```
+
+Every custom error above is exercised by at least one negative test (T-A8-4);
+this block is the **complete** revert-selector set — a router revert branch with
+no declared error fails the T-A8-4 gate. The deploy-time guards
+(`ZeroMinProgress`, `ZeroTimelockDelay`, `UnsupportedNetwork`, `ZeroGenesisAnchor`,
+`ZeroImageId`) back the §8 constructor invariants and are covered by the
+golden-deployment tests (T-A14-1/3).
 
 **Coverage obligations this list creates (wired into `docs/journal-coverage.md`
 and `contracts/test`):**
@@ -637,7 +675,7 @@ and `contracts/test`):**
 - Every R-rule (R1..R8) has at least one selector and one negative test; the
   fixed order is asserted (a version-bad-AND-length-bad journal reverts on the
   length gate R1 first — the cheapest most-discriminating check, ADR-003 D7).
-- The extension-chaining errors (`StaleAnchor`, `NonMonotonicEpoch`,
+- The extension-chaining errors (`StaleAnchor`, `EpochRegression`,
   `BadChainLength`, `BelowMinProgress`) are each pinned by a mutant fork test
   that FAILS if the corresponding check is deleted (the A10 load-bearing-checks
   ledger — THREAT_MODEL A10: every contract-side check is load-bearing or
@@ -684,11 +722,13 @@ struct HeliographDeployParams {
 
     // ── Anti-griefing (A13) ────────────────────────────────────────────────────
     uint64  minProgress;      // MANDATORY minimum-progress parameter (A13). Domain =
-                              //   "tip-advance in the SAME unit tipEpoch is measured"
-                              //   (Cardano epoch/slot advance per extension). Sized
-                              //   against measured proving latency after M0 (ADR-002
-                              //   D4); a value of 0 is REJECTED at deploy (defeats
-                              //   the front-run defense — V-BLOB-VUL-001).
+                              //   ctx_block_number advance per extension (Cardano BLOCK
+                              //   height), NOT epoch/slot — the dominant same-epoch
+                              //   extension advances block height within a constant
+                              //   epoch. Sized against measured proving latency after
+                              //   M0 (ADR-002 D4); a value of 0 is REJECTED at deploy
+                              //   (ZeroMinProgress — defeats the front-run defense,
+                              //   V-BLOB-VUL-001).
 
     // ── Initial checkpoint (base case; A14 T-A14-2) ────────────────────────────
     // The router MAY be deployed with NO checkpoint (headNonce reads reverts
@@ -774,7 +814,7 @@ Recorded so the M4 router build resolves them explicitly, not by default:
 | Allowed-image-ID + trust-anchor registry behind a timelocked admin | §4 `IHeliographRegistry` (propose→timelock→execute) |
 | Events at proposal time for indexer early-warning | §4 `ImageIdProposed`/`GenesisAnchorProposed` emitted at PROPOSE |
 | Checkpoint storage = append-only nonce ledger (lightclient-patterns §6.4) | §6 `_ledger[nonce]` + `_headNonce` |
-| prev_checkpoint == stored + monotonic epoch/slot enforced | §5 `StaleAnchor`, `NonMonotonicEpoch`, `BadChainLength` |
+| prev_checkpoint == stored + strict `chain_length`+1 + non-decreasing `tip_epoch` enforced | §5 `StaleAnchor`, `BadChainLength`, `EpochRegression` |
 | Minimum-progress parameter (mandatory, A13) | §5 `BelowMinProgress`, §8 `minProgress` param (0 rejected) |
 | Explicit "no function mutates a stored checkpoint" (T-A8-1) | §4 (registry can't reach ledger), §6 (append-only, no rewrite selector), §7 (no such error because no such path) |
 | Constructor/deploy params, each mapping key-domain documented (T-A14-1/2/3) | §8 `HeliographDeployParams` (three Cardano height domains + nonce, each at its field) |

@@ -168,8 +168,15 @@ clears today (ADR-004; THREAT_MODEL A6 "image-ID supply chain", A7
    upstream (the Sextant transcription discipline,
    docs/notes/mithril-recursion-watch.md §4 asks 2 and 5).
 3. Pass the equality invariant against the STM-walk source over the full corpus
-   (D1 postcondition) — the native `CheckpointState` must be byte-identical to
-   the STM-walk `CheckpointState` for the same anchor, or one of them is wrong.
+   (D1 postcondition) — the native `CheckpointState` must be **semantically
+   equivalent** to the STM-walk `CheckpointState` for the same anchor, produced
+   over a **source-invariant `avk_commitment` preimage**: S5/S6 are defined over
+   the Mithril-protocol AVK root (`mt_root ‖ total_stake`, ADR-003 D5), which
+   every checkpoint source must expose, so the two sources yield byte-identical
+   S5/S6 without either passing through its own proof-system-internal hash. If
+   the native path cannot surface the protocol `mt_root`, that is an ADR-003
+   codec-revision trigger before the `claim_version=1` freeze, not a swap that
+   silently changes the commitment.
 4. Carry the Midnight ZK library audit into THREAT_MODEL §3 as a documented
    vendor-trust row, exactly as the zkVM vendors' audit lineage is
    (THREAT_MODEL §3 vendor-trust surface; watch row).
@@ -249,14 +256,14 @@ relationship-building deliverable, not a v0.1 dependency.
 **Neutral / obligations created.**
 
 - `hg-claims` must define `CheckpointState` such that both implementations can
-  populate it identically — in particular `avk_commitment` /
-  `next_avk_commitment` preimage encodings (CLAIMS S5/S6, deferred to ADR-003)
-  must be expressible from *both* the STM-walk AVK (Blake2b-256 Merkle
-  commitment + total stake) and the native path's Poseidon-hashed Merkle
-  commitment. This is an ADR-003 constraint this ADR raises: the commitment
-  field is a *binding commitment to the AVK*, defined by heliograph's codec,
-  not a passthrough of either proof system's internal hash. Recorded as an
-  open question below.
+  populate it identically. ADR-003 D5 resolves the constraint this ADR raises:
+  `avk_commitment` / `next_avk_commitment` (CLAIMS S5/S6) are defined over the
+  **Mithril-protocol AVK root** (`mt_root ‖ total_stake`), which is the AVK the
+  protocol itself defines — source-invariant, exposed by the STM-walk directly
+  and required to be exposed by any native source (its internal Poseidon hashing
+  is not the commitment). The commitment is therefore a binding commitment to
+  the *protocol* AVK, not a passthrough of a proof-system-internal hash, and the
+  native source must surface `mt_root` to reproduce it (ADR-003 D5).
 - When ADR-005a is written, it must record the rejected option verbatim
   (the const-vs-input anchor placement, CLAIMS §6 open question 3;
   THREAT_MODEL A11) and walk the full governed rotation

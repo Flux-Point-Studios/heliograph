@@ -70,7 +70,7 @@ different chaining mechanism:
 
 1. **On-chain (the router):** a contract already stores the latest proven
    checkpoint. Chaining the new certificate against *stored state* (journal
-   `prev_tip_hash == stored checkpoint tip_hash` + monotonic epoch/slot) is the
+   `prev_tip_hash == stored checkpoint tip_hash` + strict `chain_length`+1) is the
    SP1Tendermint / Blobstream0 / SP1Helios pattern (lightclient-patterns §1.4,
    §2b) — no recursion machinery, each proof small because the Mithril chain's
    own structure (cert N signs the AVK committed by cert N−1) plays the role
@@ -103,8 +103,9 @@ those two modes are exactly the two chaining mechanisms, not two encodings of on
 - **A10 malicious-prover input selection** (THREAT_MODEL A10): all inputs
   authentic, every proof valid, but the prover *selects* an old checkpoint
   (regression) or a minority fork. The on-chain defense is the router accepting
-  extensions only (`journal.prev_checkpoint == stored checkpoint` + monotonic
-  epoch/slot; THREAT_MODEL A10 mitigations, lightclient-patterns §1.4). Off-chain,
+  extensions only (`journal.prev_checkpoint == stored checkpoint` + strict
+  `chain_length`+1 progress; THREAT_MODEL A10 mitigations, lightclient-patterns
+  §1.4). Off-chain,
   the journal's anchor fields are the only defense and the consumer must check
   them (THREAT_MODEL A10 residual risk).
 
@@ -233,8 +234,13 @@ extensions only**, exactly like every surveyed production LC
 (lightclient-patterns §1.4, §2b):
 
 - It accepts a `0x0002` proof in `anchor_mode = 1` and requires
-  `journal.prev_tip_hash (E3) == stored checkpoint tip_hash` **plus monotonic
-  `epoch`/`slot`** (E4 `prev_tip_epoch`, the new-state `tip_epoch`; CLAIMS §3.2).
+  `journal.prev_tip_hash (E3) == stored checkpoint tip_hash` **plus strict
+  `chain_length`+1 progress** (`chain_length == stored + 1`; CLAIMS §3.2, E5-E17),
+  which is strictly monotone by construction for BOTH extension shapes, **plus a
+  NON-DECREASING `tip_epoch`** (same-epoch extensions keep the epoch constant —
+  the dominant case, ~765 intra-epoch certs per boundary crossing,
+  mithril-recursion-watch §3; only a strictly decreasing epoch is a regression).
+  A checkpoint has no `slot` field (CLAIMS §2.4), so there is no slot rule.
   An old-checkpoint regression (extend checkpoint N−k against a router at N) is
   structurally rejected — the A10 defense (THREAT_MODEL A10 mitigations;
   T-A10-1). This is the mode-1 anchor discharge "by construction" (CLAIMS §2.3).

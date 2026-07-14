@@ -243,20 +243,29 @@ avoids importing a second.
   `mithril.rs:288`; guest-feature note item 4). No re-hash; the guest journals
   the bytes Sextant computed. Mutant: any spliced root/tip changes these bytes.
 - **S5 `avk_commitment`:** `Blake2b256( mt_root ‖ BE64(total_stake) )`, where
-  `mt_root` is the 32-byte Merkle-tree commitment root of the tip's aggregate
-  verification key and `total_stake` is its `u64` total stake — the two fields
-  Sextant deserializes as the AVK (`{mt_commitment:{root, nr_leaves},
-  total_stake}`, sextant-legs.md §2.3 step 1). `nr_leaves` is NOT in the
-  preimage: it is a structural bound already capped by `guard_stm_bounds`
-  (`MAX_AVK_LEAVES` 2^24) and pinned by the certificate content hash (S2); the
-  commitment binds *what the next signature verifies under* (root + stake),
-  which is exactly `(mt_root, total_stake)`. The exact byte order of the AVK
-  wire is transcribed from mithril-stm 0.10.5 at M1 (sextant-legs.md §4
-  unresolved); this ADR fixes the preimage *shape* — `mt_root ‖ BE64(stake)`,
-  Blake2b-256 — and the golden vector locks the bytes at M1. Mutant: a forged
-  AVK root or altered stake changes the commitment; the next extension's STM
-  verify then fails against it (S5 is what the successor certificate's
-  signature is checked under, CLAIMS.md §3.2).
+  `mt_root` is the **Mithril-protocol AVK Merkle root** (`mt_commitment.root`,
+  32 bytes) and `total_stake` is its `u64` total stake — the two fields Sextant
+  deserializes as the AVK (`{mt_commitment:{root, nr_leaves}, total_stake}`,
+  sextant-legs.md §2.3 step 1). **`mt_root` is source-invariant by construction:**
+  it is the aggregate verification key as the *Mithril protocol* defines it (the
+  Blake2b commitment the STM aggregate signature verifies under), not an artifact
+  of any one proof system. This is what makes S5 reproducible under ADR-005: a
+  native recursive-certificate checkpoint source MUST expose this same protocol
+  `mt_root` (its internal Poseidon hashing, if any, is not the commitment); if a
+  future source cannot surface the protocol root, that is a codec-revision
+  trigger BEFORE the `claim_version=1` freeze, not a silent divergence. `nr_leaves`
+  is NOT in the preimage: `mt_root` already commits the tree (leaf count and
+  shape) at the mithril-stm layer, and for a mode-1 extension the prior
+  `CheckpointState`'s S5 is bound via R6 to a previously-proven stored checkpoint
+  (whose S5 was proven when appended), so `nr_leaves` is transitively bound; the
+  commitment binds *what the next signature verifies under* (root + stake), which
+  is exactly `(mt_root, total_stake)`. The exact byte order of the AVK wire is
+  transcribed from mithril-stm 0.10.5 at M1 (sextant-legs.md §4 unresolved); this
+  ADR fixes the preimage *shape* — `mt_root ‖ BE64(stake)`, Blake2b-256 — and the
+  golden vector locks the bytes at M1. Mutant: a forged AVK root or altered stake
+  changes the commitment; the next extension's STM verify then fails against it
+  (S5 is what the successor certificate's signature is checked under,
+  CLAIMS.md §3.2).
 - **S6 `next_avk_commitment`:** `Blake2b256( next_avk_bytes )` where
   `next_avk_bytes` is the raw
   `ProtocolMessagePartKey::NextAggregateVerificationKey` value read from the
@@ -376,7 +385,13 @@ read (D0 / T-A4-5).
 6. **R6 — anchor binding.** Per `anchor_mode` (§2.3): mode 1, the journal's
    anchor fields == independently verified state (router's stored checkpoint /
    sibling proof); mode 2, the in-guest inner-journal checks already ran and
-   `inner_image_id` passed R5. Else reject.
+   `inner_image_id` passed R5. Else reject. R6 applies **uniformly regardless of
+   H5** — identity/anchor fields are committed INPUTS (CLAIMS §3.4), populated on
+   both accept and rejection journals; only unreached PAYLOAD/result fields are
+   zeroed on a rejection (CLAIMS §4.2). A BUILD implementation MUST NOT "zero all
+   body fields on any rejection" — that would break R6 on a valid journaled
+   rejection (e.g. `NotIncluded`, which checks membership against a populated
+   `certified_root`).
 7. **R7 — band/presence validity.** Every presence flag ∈ {0,1}; every typed
    discriminant in its allowed set (`datum_kind` ∈ {0,1,2}; `anchor_mode` ∈
    {1,2}; `spend_status == 0` on 0x0005, CLAIMS.md U12/§4.6); no gated payload
@@ -413,7 +428,7 @@ Bodies begin at `BODY_OFF = 46`. All multi-byte integers big-endian; all
 `[u8;32]`/`[u8]` raw. Field order is CLAIMS.md order (normative, §1.8). Each
 `LEN_*` is `HDR_LEN (46) + body length`.
 
-### `CheckpointState` shared group (§2.4) — 154 bytes
+### `CheckpointState` shared group (§2.4) — 209 bytes
 
 | off (in group) | field | type | w |
 |----:|---|---|---:|

@@ -552,7 +552,8 @@ the light-client incident survey; A14 from the audit harvest (Zellic finding
     (Sextant README.md:143 via docs/notes/sextant-legs.md Leg 1). Heliograph
     proves exactly what Sextant verifies, no more (HANDOFF §2).
   - On-chain, the router accepts extensions only: `journal.prev_checkpoint
-    == stored checkpoint` plus monotonic epoch/slot — old-checkpoint
+    == stored checkpoint` plus strict `chain_length`+1 and a non-decreasing
+    `tip_epoch` (a checkpoint has no slot field; ADR-002 D4) — old-checkpoint
     regression is structurally rejected, the same rule every surveyed
     production LC enforces (docs/notes/lightclient-patterns.md §1.4, §2b).
   - Sextant's own anti-selection anchors ride through: `require_through`
