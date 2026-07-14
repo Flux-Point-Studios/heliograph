@@ -52,27 +52,26 @@ the SP1-path pairing story).
 3. **File the upstream note** as a Sextant issue (within-org; tracked as the
    first cross-repo artifact).
 
-## Blockers — HANDOFF §12 open items needing human input
+## HANDOFF §12 items — status after the 2026-07-14 human greenlight
 
-| Item | Suggestion on the table | Needed for |
+| Item | Value | Status |
 |---|---|---|
-| `{{MAX_PROOF_TIME}}` | ≤ 10 min / checkpoint-update on bench HW | bakeoff spec + M0 go/no-go |
-| `{{MAX_PROOF_COST}}` | ≤ $1 / update | bakeoff spec + M0 go/no-go |
-| `{{BENCH_HARDWARE}}` | one pinned GPU cloud SKU | bakeoff spec |
-| `{{EVM_TESTNET}}` | Base Sepolia | M4 deployment target |
-| `{{PROVER_BUDGET}}` | — | Phase 2–3 proving spend cap (§9 gate 4) |
-| v0.1 claim scope | inclusion + UTxO-read (both) | CLAIMS.md v1 freeze |
-| Security disclosure contact | — | SECURITY.md |
-| License | Apache-2.0 (default; committed) | confirm or amend |
+| `MAX_PROOF_TIME` | ≤ 10 min / checkpoint-update | **SIGNED** (BENCH.md §5 rev 1) |
+| `MAX_PROOF_COST` | ≤ $1 / update | **SIGNED** |
+| `BENCH_HARDWARE` | AWS `g6e.xlarge` (1× L40S) | **SIGNED** |
+| `REGRESSION_PCT` | > 10 % CI flag | **SIGNED** |
+| `EVM_TESTNET` | Base Sepolia | **SIGNED** (M4 target) |
+| v0.1 claim scope | inclusion + UTxO-read (both; types 0x0001–0x0005) | **SIGNED** |
+| License | Apache-2.0 | **CONFIRMED** |
+| `PROJECT_NAME` / `GITHUB_ORG` | heliograph / Flux-Point-Studios | resolved 2026-07-14 |
+| `{{PROVER_BUDGET}}` | — | **STILL OPEN** — required before any PAID proving
+  run (§9 gate 4); local/CPU/owned-GPU runs are unblocked without it |
+| Security disclosure contact | proposed: GitHub Private Vulnerability
+  Reporting on this repo | **PROPOSED** — needed by Phase-3 SECURITY.md;
+  adopt-or-amend before then |
 
-**Recommendation:** accept the suggested defaults for the bakeoff thresholds
-and Base Sepolia; the only items with no sensible default are
-`{{PROVER_BUDGET}}` and the disclosure contact. Phase-0 recon and CLAIMS/THREAT
-drafting are NOT blocked on any of these — only the bakeoff spec's exit gate is.
-
-Resolved: `{{PROJECT_NAME}}` = **heliograph**, `{{GITHUB_ORG}}` =
-**Flux-Point-Studios** (repo created by direct instruction, 2026-07-14).
-ADR-000 still owes the crates.io / npm / ecosystem availability sweep.
+ADR-000 still owes the crates.io / npm / ecosystem availability sweep
+(Phase 1).
 
 ## Pending §9 gates
 

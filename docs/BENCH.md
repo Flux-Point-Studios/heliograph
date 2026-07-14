@@ -1,7 +1,7 @@
 # BENCH.md — proving benchmarks: M0 bakeoff spec + append-only ledger
 
-**Status: DRAFT (Phase 0). Thresholds in §5 are PROVISIONAL and await human
-sign-off (HANDOFF §12). No measurement rows exist yet.**
+**Status: SPEC SIGNED (Phase 0, revision 1 — thresholds human-signed
+2026-07-14, §5). No measurement rows exist yet.**
 
 This file is two things and stays two things:
 
@@ -313,19 +313,17 @@ Before a row may be judged against thresholds:
 
 ## 5. Thresholds and the go/no-go rule
 
-> **PROVISIONAL — AWAITING HUMAN SIGN-OFF (HANDOFF §12).** The values below
-> are the HANDOFF's own suggestions, adopted verbatim as working numbers so
-> the harness can be built. They are not binding until a human signs them;
-> the Phase-0 exit gate requires "bakeoff spec approved with human-set
-> thresholds (§12)". Sign-off is recorded by replacing this banner with the
-> signer + date, as a dated spec revision.
+> **SIGNED OFF — human greenlight, 2026-07-14** (spec revision 1; the
+> PROVISIONAL banner this replaces is preserved in git history). The values
+> below are binding for the M0 gate. Amending any of them is a new dated spec
+> revision requiring the same sign-off.
 
-| placeholder | PROVISIONAL value | notes |
+| threshold | SIGNED value | notes |
 |---|---|---|
-| `{{MAX_PROOF_TIME}}` | **≤ 10 min per checkpoint-update** on `{{BENCH_HARDWARE}}` | judged on W-MN1 end-to-end (fixture → Groth16), per §2.1's checkpoint-update proxy argument |
-| `{{MAX_PROOF_COST}}` | **≤ $1 per update** | computed per §4.4 on the pinned SKU |
-| `{{BENCH_HARDWARE}}` | **one pinned GPU cloud SKU** — candidate for sign-off: AWS `g6e.xlarge` (1× NVIDIA L40S 48 GB, x86-64 host, 4 vCPU / 32 GiB) | hard constraints: x86-64 host (RISC Zero Groth16 wrap is x86-only, even under Docker — risc0.md §3); CUDA compute capability ≥ 8.6, ≥ 24 GB VRAM recommended (SP1 CUDA prover — sp1.md §3); ≥ 16 GB RAM + Docker (both vendors' wrap pipelines) |
-| `{{REGRESSION_PCT}}` (HANDOFF §7) | **> 10 %** proving-time regression flagged by CI | ledger-adjacent; listed here because it is the same sign-off conversation |
+| `MAX_PROOF_TIME` | **≤ 10 min per checkpoint-update** on `BENCH_HARDWARE` | judged on W-MN1 end-to-end (fixture → Groth16), per §2.1's checkpoint-update proxy argument |
+| `MAX_PROOF_COST` | **≤ $1 per update** | computed per §4.4 on the pinned SKU |
+| `BENCH_HARDWARE` | **AWS `g6e.xlarge`** (1× NVIDIA L40S 48 GB, x86-64 host, 4 vCPU / 32 GiB) | satisfies the hard constraints: x86-64 host (RISC Zero Groth16 wrap is x86-only, even under Docker — risc0.md §3); CUDA compute capability ≥ 8.6, ≥ 24 GB VRAM recommended (SP1 CUDA prover — sp1.md §3); ≥ 16 GB RAM + Docker (both vendors' wrap pipelines) |
+| `REGRESSION_PCT` (HANDOFF §7) | **> 10 %** proving-time regression flagged by CI | ledger-adjacent; signed in the same conversation |
 
 Threshold-bearing result = the **better vendor's** W-MN1 end-to-end proving
 wall time and cost, on the pinned SKU, with the differential check and
@@ -343,9 +341,7 @@ re-litigation from the agent side, no "one more experiment" past the gate.
 The three named options map to: ADR-005's native recursive-certificate path
 (mithril-recursion-watch §2), a reduced claim scope (CLAIMS.md §2.1 registry
 subset), and hybrid trust models (documented, not invented — a §9
-conversation). While thresholds remain provisional, M0 **cannot pass** its
-gate — results are reported and escalate to sign-off regardless of the
-numbers.
+conversation).
 
 ## 6. Per-vendor measurement notes
 
