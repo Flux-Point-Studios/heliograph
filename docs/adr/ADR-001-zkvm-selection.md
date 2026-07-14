@@ -304,6 +304,18 @@ Absent a trigger, the M0 DECISION stands.
   BENCH.md §6.2). It is a strong prior that shapes the *expected* outcome, not a
   substitute for the wall-time and cost numbers the thresholds are written
   against. Recorded as a factor (C3.5), not a verdict.
+
+  > **S-0001/S-0002 resolved (2026-07-14, BENCH.md §8.6): BOTH arms compile,
+  > zero Sextant changes.** RISC Zero: vanilla blst C *and* the accelerated
+  > fork both build+link (the §6.2 control pair is obtainable); rayon
+  > compiles/links under guest std (runtime behavior an M0 item); image ID
+  > derived, same-host reproducible. SP1: blocks stock at the blst cc wall as
+  > predicted, but a Debian riscv cross-gcc unblocks it (vendor-unblessed,
+  > unaccelerated — the `sp1-patches/bls12_381` pure-Rust seam stays the
+  > documented primary for threshold-bearing rows). Consequence: the bakeoff
+  > proceeds with BOTH arms measurable; the compile question no longer
+  > discriminates. The DECISION remains deferred to M0 *numbers* per this
+  > ADR's criteria — nothing here picks a vendor.
 - **Run both vendors in production (no selection).** Rejected for v0.1: two
   vendors means two image-ID trust anchors, two wrap ceremonies, two verifier
   admin surfaces, and doubled reproducible-build and audit-scoping obligations

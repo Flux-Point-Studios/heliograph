@@ -120,6 +120,31 @@ both SP1 and RISC Zero arms until ADR-001 is decided on M0 numbers).
   that FAILS on statusless rows, proven both directions; the CLAIMS §4.2
   rejection-population obligation carried below).
 - Gate grew: fmt + clippy `-D warnings` + tests + the coverage-ledger check.
+- **M0 compile spikes S-0001/S-0002 (BENCH §8.6): BOTH ARMS COMPILE, zero
+  Sextant changes.** RISC Zero: all three layers (default graph; vanilla blst C
+  — the unaccelerated control builds; the `v0.3.16-risczero.0` accelerated fork
+  patches cleanly, image ID `5515edd6…990e3080`, same-host reproducible ×2).
+  SP1: blocks stock at the blst cc wall exactly as recon predicted, unblocked
+  by a Debian riscv cross-gcc (vendor-unblessed; `sp1-patches/bls12_381` stays
+  the documented primary). Evidence committed: `spikes/{risc0,sp1}-mithril/`
+  with reproducing build.sh per arm. The compile question NO LONGER
+  discriminates ADR-001 — M0 numbers will.
+- **Fixtures harvested + pinned (BENCH §8.3):** F-PP1 (preprod, byte-identical
+  to the Sextant golden vector AND the §3.1 pin — the identity chain verified)
+  and F-MN1 (mainnet epoch 643, CardanoTransactions, k=1944, 59 sigs / 1,971
+  indices / 244 AVK leaves — chain-median class), verbatim aggregator bytes.
+
+## M0 proper — next
+
+1. **Executor runs** (no §9 gate, no spend): F-PP1 through the RISC Zero
+   executor (`RISC0_DEV_MODE`/r0vm) — first runtime question: does mithril-stm's
+   verify path spawn rayon threads in the single-threaded guest? Differential
+   vs native Sextant + the tamper control; `env::cycle_count` stage split
+   (§8.5). Same for SP1 executor.
+2. Host-side `cargo risczero build` for the canonical registry image ID +
+   a true two-runner T-A6-1.
+3. GPU proving on the pinned SKU = the first PAID step — **blocked on
+   {{PROVER_BUDGET}}** (§9 gate 4).
 
 ### Carried obligations (explicit, so they cannot evaporate)
 
