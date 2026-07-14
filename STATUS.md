@@ -105,9 +105,13 @@ both SP1 and RISC Zero arms until ADR-001 is decided on M0 numbers).
 
 ### Human touchpoints (not blocking)
 
-- **Upstream note filing is a §9 gate.** `docs/notes/sextant-upstream-needs.md`
-  is paste-ready; filing it on the Sextant repo is "public beyond the created
-  repo" — needs a human go. Held.
+- ~~Upstream note filing~~ **RESOLVED IN-HOUSE**: Sextant is our own org repo
+  (no §9 gate) — the `guest` no_std feature landed as **Sextant PR #60**
+  (default graph no_std+alloc; rv32im guest-canary harness gate; the
+  crate-type fix that unblocks ANY guest dependency build). The only remaining
+  external ask is the mithril-stm backend seam on IOG's Mithril repo —
+  §9-gated, deferred until M0 says it's needed (both zkVM targets ship std
+  in-guest, so likely moot).
 - **`{{PROVER_BUDGET}}`** — required only before any PAID proving run
   (§9 gate 4). M0 can open on local/CI hardware.
 

@@ -1,9 +1,22 @@
 # Sextant upstream need: a `no_std + alloc` build of the default graph
 
-Status: draft v1 (heliograph Phase 0). To be filed as an issue/PR against
-`github.com/Flux-Point-Studios/sextant`. All file:line cites verified against
-sextant @ `a0729fd` (2026-07-14). Companion analysis: heliograph
-`docs/notes/sextant-legs.md`.
+Status: **RESOLVED IN-HOUSE — implemented as Sextant PR #60** (2026-07-14;
+Sextant is our own org repo under the delegated build→red-team→merge loop, so
+no §9 gate applied). The ask below was drafted for filing and is preserved as
+the design record; what landed matches §2a/§3(iii)/§4/§5 verbatim, plus one
+finding the draft missed: **the manifest's multi-crate-type lib
+(`["lib","cdylib","staticlib"]`) breaks ANY bare-metal dependency build**
+(cdylib/staticlib are built even for dependency builds and demand a panic
+handler + allocator) — fixed by an rlib-only manifest with the artifacts
+pipeline requesting linkables via `cargo rustc --crate-type`. Probe result for
+§3: `--features mithril` without std stops at `subtle` (dep graph, not Sextant
+source); both zkVM targets ship std in-guest, so the mithril leg rides vendor
+std targets (M0 confirms). The ONLY remaining external ask is the
+mithril-stm backend seam (§3 option ii — an ask on IOG's Mithril repo, §9-gated,
+and possibly moot if blst-C compiles under the vendor toolchains at M0).
+
+All file:line cites verified against sextant @ `a0729fd` (2026-07-14).
+Companion analysis: heliograph `docs/notes/sextant-legs.md`.
 
 ## 1. Context
 
