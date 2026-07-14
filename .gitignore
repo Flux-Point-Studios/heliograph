@@ -1,3 +1,6 @@
+# Agent tooling (never committed)
+.claude/
+
 # Local loop plan (session-local, never committed — mirrors the Sextant convention)
 LOOP.md
 
