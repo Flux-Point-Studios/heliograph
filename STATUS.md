@@ -52,26 +52,46 @@ the SP1-path pairing story).
 
 ## Next actions
 
-**Phase 1 — DESIGN (ADRs).** Non-gated design work proceeds autonomously; the
-two human touchpoints are flagged as such.
+**Phase 1 — DESIGN.** ADRs + sketches DRAFTED (`docs/adr/`, `docs/design/`):
 
-1. **ADR-000** — ecosystem/naming availability sweep (crates.io `hg-*` / npm
-   `@heliograph` / GH org / ENS-if-relevant); pure research, unblocks crate
-   naming for the workspace.
-2. **ADR-002 / ADR-003 / ADR-004 / ADR-005** — recursion architecture,
-   canonical journal codec, reproducible-build path, checkpoint-source trait.
-   Draftable now from the recon; each cites its notes.
-3. **ADR-001 (zkVM vendor selection)** — SKELETON only. The DECISION section is a
-   **§9 human gate** and awaits M0 numbers; Phase 1 writes the criteria +
-   bakeoff-wiring, not the choice.
+- **ADR-000 Naming** — Accepted. Live sweep: `heliograph` free at the GitHub
+  org/repo and (decisively) across Cardano/ZK — no project carries the name.
+  Crates `hg-*` all free; npm scope `@fluxpoint` (‑ `@heliograph` couples to an
+  unrelated existing npm user). Bare `heliograph` on crates.io/npm are dormant
+  unrelated packages, deliberately not contested.
+- **ADR-002 Recursion** — Accepted. Three-layer hybrid: `0x0001` base case,
+  `0x0002` extend-by-one via in-guest composition (inner image-ID journaled =
+  the A3 defense), router chains checkpoints CONTRACT-SIDE (A10). Priced: ≈105×
+  amortization today. RISC Zero self-recursion wiring provisional pending the
+  M1 spike (fallback recorded).
+- **ADR-003 Journal codec** — Accepted. Big-endian flat fixed-width, one
+  encoding per value, one buffer feeds digest+parse (A4/T-A4-5). Rules frozen;
+  `claim_version=1` assigned at the CLAIMS v1 freeze (Phase 2).
+- **ADR-004 Reproducible builds** — Accepted. Docker-pinned per vendor; image
+  ID publicly recomputable; two-independent-builds CI (T-A6-1). Vendor-neutral.
+- **ADR-005 Checkpoint source** — Accepted. `CheckpointSource` trait; native
+  recursive-cert path is a future §9-gated swap (upstream unsafe-setup +
+  in-flight audit gates not yet cleared).
+- **ADR-001 zkVM selection** — SKELETON. DECISION section literally "DEFERRED —
+  filled by M0, human sign-off required" (§9 gate 2). Criteria wired to the
+  signed BENCH thresholds; loser's numbers to be recorded too.
+- **Sketches** (`docs/design/`): `hg-claims` API (1055 lines, no_std codec),
+  contract interface (857 lines, thin router over untouched vendor verifier),
+  test strategy (625 lines, all 40 ledger rows wired to gate/CI/release).
 
-### Human touchpoints (not blocking the above)
+### Phase-1 exit gate — remaining
+
+ADRs ✓ / `hg-claims` API sketch ✓ / contract interface sketch ✓ / test
+strategy ✓. **Ready for exit review** → tag `phase-1` → Phase 2 (M0 bakeoff).
+M0 is the first thing that needs a vendor path built (both arms until ADR-001).
+
+### Human touchpoints (not blocking)
 
 - **Upstream note filing is a §9 gate.** `docs/notes/sextant-upstream-needs.md`
-  is paste-ready, but filing it on the Sextant repo is "public beyond the
-  created repo" — needs a human go. Held.
+  is paste-ready; filing it on the Sextant repo is "public beyond the created
+  repo" — needs a human go. Held.
 - **`{{PROVER_BUDGET}}`** — required only before any PAID proving run
-  (§9 gate 4). Local/CI runs proceed without it.
+  (§9 gate 4). M0 can open on local/CI hardware.
 
 ## HANDOFF §12 items — status after the 2026-07-14 human greenlight
 
