@@ -28,9 +28,15 @@
   Tier-1/Tier-2 types; common journal header (claim_version, claim_type,
   network_id, genesis_vkey, verdict); journaled rejections; every field seeded
   for the mutant zoo. Byte layout deferred to ADR-003.
-- **`docs/THREAT_MODEL.md` v1** — 12-adversary catalog (A1 under-constrained
-  journals … A13 griefing), vendor-trust table, out-of-scope. Pre-red-team
-  (v2 lands after Phase 3).
+- **`docs/THREAT_MODEL.md` v1** — 14-adversary catalog (A1 under-constrained
+  journals … A14 deployment-init), vendor-trust table, out-of-scope. Both
+  audit PDFs read in full and harvested: Zellic sp1-helios (findings 3.1–3.5;
+  the meta-finding — guest in scope, zero guest findings, missed the PR #54
+  hole — folded into A1) and Veridise blobstream0 (V-BLOB-VUL-001..004). New:
+  A14 (deploy-init, from the constructor key-domain bug), the load-bearing-
+  checks ledger (A10), host-bindings-from-ABI + no-silent-canonicalization
+  (A4), error-selector coverage (A8), mandatory minimum-progress + front-run
+  race (A13). Pre-red-team (v2 lands after Phase 3).
 
 All five Phase-0 deliverables are now DRAFTED (see also `docs/BENCH.md` — the
 M0 bakeoff spec with PROVISIONAL thresholds + the append-only ledger skeleton,
@@ -42,13 +48,13 @@ the SP1-path pairing story).
 
 ## Next actions
 
-1. **Phase-0 exit review** against the HANDOFF exit gate: claims specified
-   with sources ✓ / threat model reviewed (needs the two unread audit PDFs:
-   Zellic/sp1-helios, Veridise/blobstream0) / bakeoff spec approved — BLOCKED
-   on the §12 threshold sign-off below / go-no-go criteria explicit ✓.
-2. **On human sign-off**: tag `phase-0`, open Phase 1 (ADR-000 naming sweep,
-   ADR-001 skeleton awaiting M0 numbers, ADR-002 recursion, ADR-003 codec,
-   ADR-004 reproducible builds, ADR-005 checkpoint-source trait).
+1. **Phase-0 exit review** against the HANDOFF exit gate — all four criteria
+   now met: claims specified with sources ✓ / threat model reviewed (both
+   audit PDFs read + harvested) ✓ / bakeoff spec approved (thresholds SIGNED) ✓
+   / go-no-go criteria explicit ✓. Ready to declare the gate passed and tag.
+2. **Tag `phase-0`**, then open Phase 1 (ADR-000 naming sweep, ADR-001
+   skeleton awaiting M0 numbers, ADR-002 recursion, ADR-003 codec, ADR-004
+   reproducible builds, ADR-005 checkpoint-source trait).
 3. **File the upstream note** as a Sextant issue (within-org; tracked as the
    first cross-repo artifact).
 

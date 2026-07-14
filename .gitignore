@@ -21,3 +21,6 @@ dist/
 # Local scratch
 /scratch
 *.log
+
+# Audit/download working area (never committed)
+.scratch/

@@ -93,7 +93,8 @@ layout (`/fixtures`, `contracts/test`, CI jobs, the unbound-input zoo with
 coverage tracked in `docs/journal-coverage.md`).
 
 Catalog letters (a)–(l) match the HANDOFF Phase-0 minimum; A13 is added from
-the light-client incident survey.
+the light-client incident survey; A14 from the audit harvest (Zellic finding
+3.2). Fourteen adversaries in all.
 
 ### A1 (a) — Under-constrained journals
 
@@ -101,14 +102,25 @@ the light-client incident survey.
   verdict) without passing through verification. The prover supplies
   arbitrary bytes for that range and obtains a *valid proof of a false
   claim*.
-- **Real-world instance.** sp1-helios PR #54: the guest committed the
-  prover-supplied `store.next_sync_committee` to `nextSyncCommitteeHash`
-  **without verification when the `updates` list was empty**; a malicious
-  prover could inject an arbitrary committee, which the contract would store
-  — handing over the light client at the next period. It survived in a
-  Zellic-audited flagship, and the hole lived on a *degenerate path* (empty
-  update list). Fix was PR #55 + an executor-based regression test
-  (docs/notes/lightclient-patterns.md §4.1).
+- **Real-world instance, pinned to the audit record** (Zellic sp1-helios
+  report 2025-08-07, commit `51b1e4a`; finding 3.1; report §5.2; PRs #54/#55).
+  The guest committed the prover-supplied `store.next_sync_committee` to
+  `nextSyncCommitteeHash` **without verification when the `updates` list was
+  empty**; a malicious prover could inject an arbitrary committee, which the
+  contract would store — handing over the light client at the next period. Two
+  lessons, layered: (1) the hole lived on a *degenerate path* (empty update
+  list) — hence T-A1-2; (2) **the Zellic assessment had `light_client.rs`
+  squarely in scope and returned zero guest-program findings** — its guest
+  threat model even states the wrong posture verbatim: *"It should be trusted
+  that the inputs are valid and correctly formatted"* (§5.2). The bug survived
+  ~10 months post-report until PR #54 (2026-06-15) reset `next_sync_committee`
+  to `None` after deserialization, with the executor-based regression test in
+  PR #55. A contract-focused external audit is evidence about the contract
+  layer *only*; the zoo (T-A1-1/T-A1-2) is **never waivable on audit grounds**.
+  Corroboration for the rejection-parity discipline: the Veridise blobstream0
+  audit records that flagship shipping with "a single test case" covering only
+  "the sunny-day behavior" (Executive Summary) — the same gap
+  docs/notes/lightclient-patterns.md §4.6 found across every surveyed vendor.
 - **What it achieves.** Total soundness failure: any Cardano "fact" the
   attacker wants, carried by a proof every honest verifier accepts.
 - **Current mitigations.**
@@ -143,6 +155,11 @@ the light-client incident survey.
     corpus run against guests built with and without vendor patched crates
     must produce identical journals (the vendor's own stated requirement,
     docs/notes/sp1.md §1).
+- **Audit-scoping obligation** (Zellic 3.1 + §5.2 + PR #54). Any external
+  audit heliograph commissions must be explicitly scoped to attack the journal
+  ABI with prover-adversarial inputs; the RFP hands the auditor
+  `docs/journal-coverage.md` and the degenerate-path zoo classes as the
+  baseline — precisely the exercise the sp1-helios audit did not perform.
 
 ### A2 (b) — Cross-network replay
 
@@ -223,6 +240,23 @@ the light-client incident survey.
   canonicality — one encoding per value, golden-tested (HANDOFF §5). Schema
   changes after v1 freeze are a §9-gate-6 human review, which is process,
   not cryptography.
+- **Host-side bindings are a fourth codec copy** (Zellic sp1-helios finding
+  3.3). sp1-helios's hand-written `sol!` bindings declared a function the
+  contract lacked (`getCurrentSlot`) and omitted one it had (`getStorageSlot`)
+  — the ABI-drift hazard at a layer our first-cut tests do not name.
+  `hg-claims` is mirrored in Solidity and TS; the Rust host's view of the
+  router ABI is a fourth surface. Rule: **host and SDK bindings are generated
+  from the compiled contract ABI artifact, never hand-written**; the generated
+  output is committed and diffed in CI.
+- **Hash exactly the bytes you decode** (Veridise blobstream0 V-BLOB-VUL-004,
+  fixed `cbd8a06`). Blobstream0's `updateRange()` decoded the submitted bytes
+  into a struct, **re-encoded** them into `journal`, and passed
+  `sha256(journal)` to the vendor verifier — a decode→re-encode→hash round-trip
+  that is sound *only* if the codec is strictly canonical, else the verifier
+  checks a digest over canonicalized bytes while the contract acts on the
+  submitted ones. Router rule, pinned: one buffer feeds both the verifier
+  digest and the field parsing; no intermediate re-encode
+  (veridise-blobstream-20240909.pdf §4.1.4).
 - **Pinning tests.**
   - **T-A4-1** — unknown-version rejection, all layers: fuzzed version bytes
     against the router (Foundry fuzz), the `hg-claims` decoder (cargo fuzz),
@@ -232,6 +266,13 @@ the light-client incident survey.
   - **T-A4-3** — golden-encoding canonicality: byte-exact golden journals per
     claim type; any second encoding of the same value is a test failure
     (HANDOFF §7 "Golden journals").
+  - **T-A4-4 — bindings-match-ABI** (Zellic 3.3): CI regenerates host/SDK
+    bindings from the router's compiled ABI and fails on any diff against the
+    committed bindings.
+  - **T-A4-5 — no silent canonicalization** (Veridise V-BLOB-VUL-004): a valid
+    claim resubmitted under a second, non-canonical encoding of the same value
+    reverts; asserts the digest handed to `verifier.verify` is computed over
+    the identical calldata bytes the router decodes.
 
 ### A5 (e) — Stale-but-valid data selection by a malicious prover
 
@@ -258,6 +299,19 @@ the light-client incident survey.
     *cannot* prove freshness and the docs must say so in exactly those words.
   - Router monotonicity (checkpoint extensions only) prevents *regression*,
     which is A10's half of this problem.
+- **Why staleness can become soundness — and why heliograph is immune to the
+  conversion** (Veridise blobstream0 V-BLOB-VUL-001, impact 2). In Blobstream0
+  an attacker who delays the on-chain head past the 2-week Tendermint trusting
+  period can then submit a block with a **forged timestamp** inside the stale
+  trusted block's window and have it wrongfully accepted — the in-guest
+  freshness heuristic evaluates prover-chosen timestamps, so a liveness attack
+  (A13) *converts into a soundness break*. Heliograph is structurally immune to
+  this specific conversion: there is no trusting-period heuristic anywhere in
+  the stack, and every as-of/anchor field is Mithril-certified, not
+  prover-chosen (§1.1). This immunity is a design invariant, not luck: **no
+  future claim type may introduce an in-guest recency check evaluated against
+  prover-supplied timestamps** (veridise-blobstream-20240909.pdf §4.1.1;
+  docs/notes/lightclient-patterns.md §4.5).
 - **Residual risk.** Permanent and structural: the consumer who ignores the
   as-of fields is unprotected, by design. This is the single largest
   documentation obligation in the product ("What a proof proves, precisely",
@@ -384,6 +438,34 @@ the light-client incident survey.
     presenting a proof-of-unsoundness halts the verifier, permanently)
     (docs/notes/risc0.md §4). Adopting the emergency-stop pattern for the
     heliograph router is an open design question for ADR review.
+- **Two primary-source confirmations of the anti-pattern** (both audits, same
+  lesson):
+  - **Blobstream0** (Veridise V-BLOB-VUL-002, Warning, Access Control,
+    *closed as Intended Behavior*): the admin can set the trusted state, the
+    image ID, and the verifier; the report notes a malicious owner "could
+    arbitrarily update the verifier which would allow them to then add
+    arbitrary Merkle roots." That a **single-key full takeover was rated only
+    Warning and accepted as intended** is the meta-lesson: external audits
+    under-price governance surfaces, so T-A8-1/2/3 carry this defense
+    permanently and audit sign-off never substitutes for them. Blobstream0's
+    own mitigation was a developer *plan* ("plan to use a time-locked
+    multi-signature wallet") — heliograph's timelock + key-custody decision
+    (§9 gate 3) must be **deployed and fork-tested before v0.1.0**, not
+    roadmapped (veridise-blobstream-20240909.pdf §4.1.2).
+  - **SP1Helios** (Zellic §5.1, discussion 4.1): the guardian rotates
+    `lightClientVkey`/`storageSlotVkey` with *no constraints and no delay*
+    ("Constraints: None") — an instant single-key image-ID swap — and
+    `relinquishGuardian` freezes the vkeys **irreversibly** (guardian →
+    `address(0)`). The timelocked registry (T-A8-2) removes the first surface
+    by construction. If heliograph's registry admin ever gains a
+    renounce/freeze path, its irreversibility becomes an ADR-recorded decision
+    pinned by a fork test: a frozen registry still verifies already-accepted
+    proofs and rejects all future registry mutations.
+- **Dead selectors mask missing constraints** (Zellic finding 3.5). Five
+  declared errors were unreachable in the audited SP1Helios — including
+  `PrevHeadMismatch`/`PrevHeaderMismatch`, names that *sound* load-bearing. An
+  unreached rejection selector is indistinguishable from a
+  designed-but-unimplemented check; hence T-A8-4.
 - **Residual risk.** A timelock converts key compromise from instant
   takeover into a *detectable, delayed* takeover; it does not remove it.
   Consumers get the timelock window to exit. The SP1 gateway's own
@@ -401,6 +483,10 @@ the light-client incident survey.
     admin-abuse-under-timelock scenario from HANDOFF Phase 3 kept permanent.
   - **T-A8-3** — fuzz the registry state machine (add/remove/propose/cancel
     orderings) for paths that bypass the delay.
+  - **T-A8-4 — error-selector and revert-branch coverage** (Zellic 3.1 + 3.5):
+    every custom error declared in the router ABI is exercised by at least one
+    negative test, and every revert path in every logical branch has a negative
+    test (Zellic 3.1's stated bar); any unreached selector fails the gate.
 
 ### A9 (i) — Data withholding / liveness
 
@@ -472,6 +558,17 @@ the light-client incident survey.
   - Sextant's own anti-selection anchors ride through: `require_through`
     closes the truncate-before-the-spend evasion (`window.rs:27-31,456-458`
     via docs/notes/sextant-legs.md Leg 5).
+- **Load-bearing-checks ledger** (Zellic sp1-helios finding 3.4). sp1-helios
+  binds pre-state by reconstructing the expected public-values struct from
+  contract storage and passing it to `verifyProof` — which made a hand-written
+  `prevSyncCommitteeHash` equality check provably redundant (removed in
+  remediation). When the heliograph router adopts this reconstructed-expected-
+  journal pattern for `prev_checkpoint` linkage, every contract-side check is
+  classified in a ledger: **load-bearing** (pinned by a mutant fork test that
+  fails when the check is deleted) or **documented-redundant** (reason filed,
+  then deleted). No redundant-looking check is removed without its ledger
+  entry; the redundancy proof is itself a test — the inverse failure (deleting
+  a check that only *looked* redundant) is exactly the A1-class hole.
 - **Residual risk.** Off-chain consumers of portable verdicts have no stored
   checkpoint; for them the journal's anchor fields are the *only* defense,
   and the consumer must actually check them against a trusted anchor of
@@ -596,27 +693,88 @@ the light-client incident survey.
   updates (tiny extensions that advance state uselessly), or feed the
   prover pathological-but-capped inputs to burn proving budget.
 - **What it achieves.** Gas and proving-cost exhaustion; checkpoint churn
-  that degrades indexers.
-- **Current mitigations.** Blobstream0 shipped `minBatchSize` only after the
-  fact (PR #49, "prevent DOS attacks") — the catalog entry exists so
-  heliograph decides *before* deployment
-  (docs/notes/lightclient-patterns.md §4.3, §6.5): permissionless update +
-  an explicit minimum-progress rule (or a recorded decision not to have
-  one) is the design point. Guest-side, Sextant's compiled-in DoS caps
-  bound cycles per input (`MAX_STM_BLOB_HEX` 4 MiB, `MAX_AVK_LEAVES` 2^24,
-  `MAX_SINGLE_SIGS` 2^16, `MAX_LOTTERY_INDICES` 2^18 — `guard_stm_bounds`,
-  mithril.rs:564-610 via docs/notes/sextant-legs.md).
-- **Residual risk.** Whatever rule is chosen trades liveness granularity
-  against spam; the decision belongs in the router ADR with the parameter
-  recorded.
+  that degrades indexers. **Worse: a valid-proof front-run can stall progress
+  entirely** (see below).
+- **Current mitigations (corrected provenance).** Blobstream0's `minBatchSize`
+  (PR #49) was the fix for the Veridise audit's **only High finding**,
+  V-BLOB-VUL-001 (Logic Error, fixed *during* the engagement — not a post-hoc
+  patch): permissionless `updateRange()` + prev-hash chaining let an attacker
+  front-run honest updates with valid *minimal* ranges, reverting each honest
+  update on hash mismatch and stalling on-chain progress indefinitely
+  (veridise-blobstream-20240909.pdf §4.1.1). Heliograph's router has the
+  identical shape (permissionless submission A9 + extension-only chaining A10),
+  with a **worse cost asymmetry**: a race loss invalidates an in-flight proof
+  that took *minutes* to generate, so the attacker re-proves cheap minimal
+  extensions while the honest prover re-proves large ones. Consequence: the
+  minimum-progress rule is **mandatory** — the "recorded decision not to have
+  one" option is withdrawn — and its parameter must be sized against measured
+  proving latency and recorded in the router ADR
+  (docs/notes/lightclient-patterns.md §4.3, §6.5).
+- **Guest-side contrast** (Veridise V-BLOB-VUL-003, Warning, Data Validation,
+  *Intended Behavior*). Blobstream0's guest reads an unbounded
+  intermediate-header list — "the computation will be slow and might
+  eventually even panic" — and shipped it as intended. Heliograph takes the
+  opposite stance: Sextant's compiled-in DoS caps (`MAX_STM_BLOB_HEX` 4 MiB,
+  `MAX_AVK_LEAVES` 2^24, `MAX_SINGLE_SIGS` 2^16, `MAX_LOTTERY_INDICES` 2^18 —
+  `guard_stm_bounds`, mithril.rs:564-610 via docs/notes/sextant-legs.md),
+  **plus explicit bounds on every input list heliograph itself introduces
+  above Sextant** (certificate-chain hop count, block-window length, batch
+  size), with over-cap inputs producing *journaled rejections at bounded cycle
+  counts, never panics* (veridise-blobstream-20240909.pdf §4.1.3).
+- **Residual risk.** The minimum-progress parameter trades liveness
+  granularity against spam; the value belongs in the router ADR, sized against
+  measured proving latency.
 - **Pinning tests.**
-  - **T-A13-1** — fork test: a valid update below the minimum-progress rule
-    is rejected (or, if the recorded decision is "no rule", a test that
-    documents and exercises the accepted-spam behavior so the decision
-    stays visible).
-  - **T-A13-2** — guest-bounds fixtures: inputs at and just over each DoS
-    cap; over-cap inputs produce journaled rejections at bounded cycle
-    counts (rejection parity + cost bound).
+  - **T-A13-1 (amended)** — minimum-progress rule **+ front-run race**: a valid
+    update below the minimum-progress rule is rejected; and, in the race
+    scenario, an adversarial minimal valid extension lands while an honest
+    proof for the same base checkpoint is pending — assert the below-minimum
+    update is rejected and the honest path recovers within a bounded number of
+    re-proves (V-BLOB-VUL-001).
+  - **T-A13-2 (amended)** — guest-bounds fixtures: inputs at and just over each
+    DoS cap, **extended to every heliograph-introduced input list, not only
+    Sextant's internal caps**; over-cap = journaled rejection at a bounded
+    cycle count, panic = test failure (V-BLOB-VUL-003).
+
+### A14 (+) — Deployment-initialization errors
+
+- **Attack / event.** Not a runtime adversary — the deployment itself.
+  Constructor and deploy-time parameters install the router's initial trusted
+  state (initial checkpoint, anchor registry contents, verifier address,
+  admin/timelock wiring) and **no proof ever checks them**. A wrong or
+  maliciously crafted deployment ships a router that is broken, lying, or
+  subtly rebindable, and nothing downstream can detect it cryptographically.
+- **Real-world instance.** Zellic sp1-helios finding 3.2 (Medium): the
+  constructor keyed `executionStateRoots` by `params.head` (a *beacon slot*)
+  instead of `params.executionBlockNumber` (an *execution block number*) and
+  never initialized `executionBlockNumber` — every `updateStorageSlot` before
+  the first `update()` reverted, and both `latest*` getters returned wrong
+  values. Fixed post-audit (sp1-helios #44, 2025-08-15). The failure shape is
+  **key-domain confusion between height domains** — and heliograph carries at
+  least three (Cardano slot, block height, epoch) through journals into router
+  storage.
+- **What it achieves.** Best case a bricked liveness path found in production
+  (the sp1-helios outcome); worst case an initial anchor or registry entry
+  that legitimizes attacker logic from block one — A8's outcome without ever
+  touching the admin key.
+- **Current mitigations.** Deployment is a governed event using a committed,
+  golden-tested parameters fixture; every router mapping's key domain is
+  documented at the ABI declaration and asserted in tests; initial state is
+  readable through the exact getters consumers will use.
+- **Residual risk.** Deployment correctness is process, pinned by tests, not
+  cryptography — the golden-deployment fixture is only as good as the review
+  that set its values. This is why A14's tests run against the *actual deploy
+  script*, not a hand-written mock.
+- **Pinning tests.**
+  - **T-A14-1 — golden deployment:** deploy with the fixture params; assert
+    every getter and every mapping returns the fixture value under its
+    documented key domain.
+  - **T-A14-2 — first-interaction works:** every consumer-facing read/verify
+    path succeeds against constructor-installed state alone, before any update
+    lands (the exact sp1-helios 3.2 failure, inverted into a test).
+  - **T-A14-3 — deploy-params round-trip:** the deploy script's emitted
+    parameters are parsed back and diffed against the committed fixture
+    (catches script↔contract drift).
 
 ---
 
@@ -680,6 +838,8 @@ Cross-reference of every pinning test named above, for wiring into
 | T-A4-1 unknown-version rejection (fuzz) | A4 | Foundry fuzz + cargo fuzz + SDK tests | CI |
 | T-A4-2 downgrade fixture | A4 | `/fixtures` + all verifier layers | CI |
 | T-A4-3 golden-encoding canonicality | A4 | `hg-claims` golden tests | `make gate` |
+| T-A4-4 bindings-match-ABI *(audit harvest)* | A4 | CI codegen check | CI |
+| T-A4-5 no silent canonicalization *(audit harvest)* | A4 | `contracts/test` | CI |
 | T-A5-1 as-of fields golden + mutant | A5 | golden journals + zoo | `make gate` |
 | T-A5-2 router-accepts / consumer-rejects | A5 | `examples/evm-oracle` fork test | CI |
 | T-A5-3 stale-selection honesty | A5 | Phase-3 scenario, permanent | CI |
@@ -690,6 +850,7 @@ Cross-reference of every pinning test named above, for wiring into
 | T-A8-1 no-state-rewrite ABI surface | A8 | `contracts/test` | CI |
 | T-A8-2 timelock delay + event | A8 | `contracts/test` fork tests | CI |
 | T-A8-3 registry state-machine fuzz | A8 | Foundry fuzz | CI |
+| T-A8-4 error-selector + revert-branch coverage *(audit harvest)* | A8 | `contracts/test` | CI |
 | T-A9-1 offline portable verdict | A9 | `examples/portable-verdict`, network-disabled | M3 gate → CI |
 | T-A9-2 permissionless update | A9 | `contracts/test` | CI |
 | T-A9-3 withholding → Stalled parity | A9 | equality-invariant corpus | `make gate` |
@@ -701,14 +862,36 @@ Cross-reference of every pinning test named above, for wiring into
 | T-A12-1 equality invariant (tier/assumptions) | A12 | full Sextant corpus, CI-blocking | `make gate` |
 | T-A12-2 tier-laundering negative | A12 | `hg-claims` schema tests | `make gate` |
 | T-A12-3 mainnet-fixture corpus gate | A12 | corpus composition check | CI |
-| T-A13-1 minimum-progress rule | A13 | `contracts/test` | CI |
-| T-A13-2 DoS-cap bounds fixtures | A13 | guest tests + `/fixtures` | `make gate` |
+| T-A13-1 minimum-progress rule **+ front-run race** | A13 | `contracts/test` | CI |
+| T-A13-2 DoS-cap bounds **incl. heliograph-introduced lists** | A13 | guest tests + `/fixtures` | `make gate` |
+| T-A14-1 golden deployment *(audit harvest)* | A14 | `contracts/test` + `/fixtures` | CI |
+| T-A14-2 first-interaction works *(audit harvest)* | A14 | `contracts/test` | CI |
+| T-A14-3 deploy-params round-trip *(audit harvest)* | A14 | deploy scripts + `/fixtures` | CI |
+
+Rows marked *(audit harvest)* were added on 2026-07-14 from the Zellic and
+Veridise reads; T-A13-1/T-A13-2 were amended in place (front-run race;
+heliograph-introduced input lists).
 
 ---
 
-*v1 freeze checklist (before Phase-0 exit gate): read the Zellic sp1-helios
-and Veridise blobstream0 audit PDFs and harvest any additional adversaries
-(docs/notes/lightclient-patterns.md, open follow-ups); resolve the SP1
-gateway ownership question or record it as an M4 blocker. v2 lands after
-Phase 3 with the zoo green and residual risks measured, and is a v0.1.0
-ship requirement (HANDOFF §3).*
+*v1 freeze checklist (before Phase-0 exit gate):*
+- ✅ **Zellic sp1-helios audit read in full** (34-page PDF at
+  `succinctlabs/sp1-helios/audits/SP1 Helios - Zellic Audit Report.pdf`, report
+  2025-08-07, commit `51b1e4a`; findings 3.1–3.5 + discussion 4.1/4.2 mapped to
+  A1/A4/A8/A10 and the new A14). Meta-finding folded into A1: the audit had the
+  guest in scope and returned zero guest findings, missing the PR #54 hole.
+- ✅ **Veridise blobstream0 audit read in full**
+  (`risc0/rz-security/audits/blobstream/veridise-blobstream-20240909.pdf`,
+  V3 rev. 2024-10-07, commit `925bff9`; findings V-BLOB-VUL-001..004 mapped to
+  A4/A5/A8/A13 — no new adversary required). Its scope excluded the CLI and the
+  `RiscZeroVerifier` contract: verifier-contract coverage comes from the
+  separate Hexens SNARK Verifier Contract audit pinned in §3, and "audited"
+  claims about blobstream0 must not be read as covering the verifier.
+- ⏳ **Not yet harvested** (v2, non-blocking): the separate **OpenZeppelin SP1
+  Helios audit** (a second independent report on the same flagship,
+  openzeppelin.com/news/sp1-helios-audit).
+- ⏳ Resolve the SP1 gateway ownership question or record it as an M4 blocker
+  (§3, sp1.md open item 5).
+
+*v2 lands after Phase 3 with the zoo green and residual risks measured, and is
+a v0.1.0 ship requirement (HANDOFF §3).*
