@@ -103,6 +103,35 @@ self-declared) — found 1 blocker + 5 majors + 3 minors, all fixed before the t
 Next: Phase 2 — **M0 bakeoff** (the first thing needing a vendor path built;
 both SP1 and RISC Zero arms until ADR-001 is decided on M0 numbers).
 
+## Phase 2 — done so far
+
+- **Sextant guest unblock (PR #60, MERGED @ 90b2672):** default graph
+  no_std+alloc; `tools/guest-canary` harness gate on rv32im; the crate-type fix
+  (rlib-only manifest — multi-crate-type libs build ALL types even as a
+  dependency, breaking bare-metal builds); mithril additivity pinned
+  (`cargo check --no-default-features --features mithril`). Red-teamed
+  (1 HIGH fixed + pinned), 4/4 CI green, squash-merged per the delegated loop.
+- **`crates/hg-claims` (the codec):** no_std+alloc, zero runtime deps, 61
+  tests. Golden-first TDD (vectors derived independently from the ADR-003
+  tables BEFORE the encoder existed); every-byte mutation zoo over all 10
+  goldens (T-A4-3/T-A1-1 seed); full fail-closed suite; adversarial review
+  verdict SHIP (3 minors, all closed: normative gate-precedence documented in
+  `decode.rs`; `docs/journal-coverage.md` ledger created with a gate check
+  that FAILS on statusless rows, proven both directions; the CLAIMS §4.2
+  rejection-population obligation carried below).
+- Gate grew: fmt + clippy `-D warnings` + tests + the coverage-ledger check.
+
+### Carried obligations (explicit, so they cannot evaporate)
+
+- **hg-guest MUST populate rejection journals** (identity/anchor fields from
+  the guest's own verification state; only unreached payload zeroed — CLAIMS
+  §4.2). The codec demonstrates but cannot enforce this; the pin is the
+  T-A12-1 equality invariant (guest journal == native Sextant verdict) at M1.
+- **M4 mirrors MUST replicate the decode gate precedence** documented in
+  `hg-claims::decode_structural` (type → length → version), with a
+  cross-surface unknown-version+unknown-type fixture.
+- S5/S6 preimage BYTES lock at M1 (formula frozen in ADR-003 D5).
+
 ### Human touchpoints (not blocking)
 
 - ~~Upstream note filing~~ **RESOLVED IN-HOUSE**: Sextant is our own org repo
