@@ -126,10 +126,14 @@ not a verdict.
 | `0x0006` | watched-window | **RESERVED — deferred** (§3.6) | Leg 5 (`verify_watched_window`) |
 | `0x0007` | certified-set-membership | **RESERVED — deferred** (§3.7) | Leg 6 (`certified_spend_status`) |
 | `0x0008` | certified-set-transition | **RESERVED — deferred** (§3.7) | Leg 6 (`apply_block` batch) |
+| `0x0F00`–`0x0FFF` | benchmark-only band | **RESERVED — never production** | BENCH.md (M0 uses `0x0F01`) |
 
 IDs are banded now, per the tier-ladder discipline: none of these are
 coercible into one another, and deferred IDs are reserved so a later addition
-is an extension, not a re-numbering.
+is an extension, not a re-numbering. The `0x0F00`–`0x0FFF` band is reserved
+for benchmark claim types (BENCH.md §2.3): they are emitted only under
+`claim_version 0` (DRAFT — rejected by every production verifier, §1.3), so a
+bench proof is doubly unacceptable in production — by version AND by type.
 
 ### 2.2 Per-claim as-of scoping
 

@@ -32,20 +32,25 @@
   journals … A13 griefing), vendor-trust table, out-of-scope. Pre-red-team
   (v2 lands after Phase 3).
 
+All five Phase-0 deliverables are now DRAFTED (see also `docs/BENCH.md` — the
+M0 bakeoff spec with PROVISIONAL thresholds + the append-only ledger skeleton,
+including the mandatory mainnet-read-only fixture and tamper/determinism
+controls — and `docs/notes/sextant-upstream-needs.md`, the paste-ready guest
+feature ask: the RISC Zero path needs ZERO Sextant changes via the
+v0.3.16-risczero.0 blst fork; the real asks are the no_std default graph and
+the SP1-path pairing story).
+
 ## Next actions
 
-1. **Bakeoff spec** (`docs/BENCH-SPEC.md` or BENCH.md preamble): identical
-   guest workload = one real preprod STM certificate verify via Sextant's
-   `mithril` path; measure cycles/wall/cost/wrap/gas on both zkVMs. Draft with
-   PROVISIONAL thresholds (marked) — approval needs the §12 numbers below.
-   MUST bench a mainnet-read-only fixture too (preprod k=5 vs mainnet k=1944).
-2. **Sextant upstream-needs note**: the `guest` feature (no_std+alloc
-   entrypoints, deterministic input encoding, no `std::time`) + the blst
-   question (RISC Zero's fork matches the pin; SP1 path needs a pure-Rust
-   pairing story or an mithril-stm backend seam).
-3. **Phase-0 exit review**: claims + threat + bakeoff spec against the HANDOFF
-   exit gate; read the two unread audit PDFs (Zellic/sp1-helios,
-   Veridise/blobstream0) before freezing THREAT_MODEL v1.
+1. **Phase-0 exit review** against the HANDOFF exit gate: claims specified
+   with sources ✓ / threat model reviewed (needs the two unread audit PDFs:
+   Zellic/sp1-helios, Veridise/blobstream0) / bakeoff spec approved — BLOCKED
+   on the §12 threshold sign-off below / go-no-go criteria explicit ✓.
+2. **On human sign-off**: tag `phase-0`, open Phase 1 (ADR-000 naming sweep,
+   ADR-001 skeleton awaiting M0 numbers, ADR-002 recursion, ADR-003 codec,
+   ADR-004 reproducible builds, ADR-005 checkpoint-source trait).
+3. **File the upstream note** as a Sextant issue (within-org; tracked as the
+   first cross-repo artifact).
 
 ## Blockers — HANDOFF §12 open items needing human input
 
