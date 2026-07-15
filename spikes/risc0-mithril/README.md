@@ -92,3 +92,40 @@ Fixed with `rust-version = "1.88.0"` + `resolver = "3"` in both crates
 
 Runs all three layers plus the image-ID derivation in a fresh pull of the
 digest-pinned builder container.
+
+---
+
+# M0 executor tier (extends S-0001; run rows R-0001…R-0008)
+
+`run-m0.sh` drives the execution-only matrix {F-PP1, F-MN1} ×
+{blst-vanilla, blst-risczero-fork} × {golden, tampered} in the same pinned
+container: instrumented guest (per-stage `env::cycle_count()` split on stderr,
+journal = u32 verdict code), host executor runner (`runner/`,
+`risc0-zkvm =3.0.5` `prove`-feature local `ExecutorImpl` — the engine
+`default_executor()`'s LocalProver wraps, called directly because
+`SessionInfo` drops `total_cycles`), and the native differential (`native/`,
+sextant `90b2672` `features=["mithril"]`, identical pipeline + verdict
+mapping). Verdict codes: 0 accept; 1 JSON parse failure; 2–8 `StandardError`
+variants in declaration order; 9 content-hash mismatch (BENCH.md §2.1 step 2).
+Evidence: `fixtures/bench/evidence/R-000{1..8}/` + shared
+`R-0000-toolchain/` (versions, ELF identities, tamper manifest, row summary).
+
+**Runtime finding (the S-0001 open question).** mithril-stm 0.10.5 never
+calls rayon in library code — its `src/` mentions `par_iter` only inside
+doc-comment examples, so rayon-core never initializes in-guest. The thread
+machinery that *does* run on the verify path is `blst`'s Rust-binding worker
+pool: `std::thread::Builder::spawn` is `Unsupported` on
+`riscv32im-risc0-zkvm-elf`, surfacing first as a disabled `sys_getenv`
+(std reads `RUST_MIN_STACK` inside `spawn`) and then as `threadpool-1.8.1`'s
+`unwrap` panic. Two additive guest-manifest features fix it with zero
+Sextant/mithril-stm changes: `risc0-zkvm-platform` `sys-getenv` and `blst`
+`no-threads` (blst's documented wasm/serial path). No upstream ask needed.
+
+**Headline executor numbers** (full table in
+`fixtures/bench/evidence/R-0000-toolchain/rows-summary.txt`): F-MN1 golden
+accepts at 930.2M user cycles (accelerated fork, 965 segments, 22.6 s
+executor wall) vs 2,533.6M (vanilla portable C) — a 2.77× verify-stage delta;
+F-PP1 51.7M vs 197.2M (3.88×). All eight rows differential-match native, and
+both tamper rows journal verdict 9 at the content-hash gate
+(`compute_hash` covers `multi_signature`, so the signature tamper flips the
+hash before `verify_standard` runs — matching native exactly).

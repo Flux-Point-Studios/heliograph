@@ -447,13 +447,15 @@ not-obtained values are `—` with a footnote, never blank, never guessed.
 
 | hw_id | date (UTC) | description (cloud SKU / GPU / CPU / RAM / region / driver, CUDA) | $/hr on-demand list (source URL, retrieval date) |
 |---|---|---|---|
-| _none yet_ | | | |
+| HW-DEV0 | 2026-07-15 | Windows 11 workstation, Docker Desktop WSL2 VM: 4 vCPU, 11.68 GiB RAM, no GPU. **Executor-tier context ONLY — not `BENCH_HARDWARE`; wall times on this row are never threshold-bearing.** | — (owned hardware; $0 marginal) |
 
 ## 8.2 Stack registry (ST-…)
 
 | stack_id | date (UTC) | vendor | zkVM crates + versions | toolchain / docker tag | patched crates (exact tags) | BLS/STM backend (crate + tag) | Sextant commit | guest commit | ELF SHA-256 | vkey bytes32 / image ID |
 |---|---|---|---|---|---|---|---|---|---|---|
-| _none yet_ | | | | | | | | | | |
+| ST-0001 | 2026-07-15 | RISC Zero | risc0-zkvm =3.0.5 (std), risc0-zkvm-platform =2.2.2 (+`sys-getenv`) | `risczero/risc0-guest-builder:r0.1.88.0@sha256:3e12f71b…` (guest rustc 1.88.0-dev, riscv32 gcc 13.2.0); host executor risc0-zkvm =3.0.5 `prove` | none | blst 0.3.16 crates.io `portable` + **`no-threads`** (serial — the documented wasm path; required, see R-0001 note) via mithril-stm 0.10.5 | `90b2672a` | `spikes/risc0-mithril` (instrumented) | `fffac3a1…70cbe8e` | image ID `68251e01…082b3324` |
+| ST-0002 | 2026-07-15 | RISC Zero | same as ST-0001 | same | `[patch.crates-io]` blst = `risc0/blst` tag `v0.3.16-risczero.0` `#7d1fc3e6` (+risc0-bigint2 1.4.13) | risc0 accelerated blst fork + `no-threads` | `90b2672a` | same | `563d55fc…a0ded07` | image ID `dab6d60d…777021f0` |
+| ST-0003 | 2026-07-15 | SP1 | sp1-zkvm 6.3.1, sp1-sdk 6.3.1 (host, `SP1_PROVER=cpu`, execute-only) | cargo-prove v6.3.1 (`8252c29`), succinct rustc 1.94.0-dev, `rust:1.93-bookworm@sha256:7c4ae649…` (+`--shm-size=8g`); **NON-CANONICAL per ADR-004 D1** (cross-gcc absent from the pinned `--docker` image — recipe gap) | none | blst 0.3.16 `portable` + **`no-threads`**, C via Debian `riscv64-unknown-elf-gcc` 12.2.0 (`CC_riscv64im_succinct_zkvm_elf`) | `90b2672a` | `spikes/sp1-mithril` (instrumented) | `739216d2…c1975685` | vkey `0x009bda93…accd4aca` |
 
 ## 8.3 Fixture registry (F-…)
 
@@ -466,15 +468,59 @@ not-obtained values are `—` with a footnote, never blank, never guessed.
 
 ## 8.4 Run ledger (R-…) — M0 rows land here
 
+**Executor-tier rows (2026-07-15).** Kind `exec` = execution only, NO proving —
+cycle-count + validity-control rows; every proving column is `—` by
+construction. Verdict differential (guest journal verdict == native Sextant on
+identical bytes) held on ALL 12 rows. `journal == golden` is `n/a·spike`: these
+guests journal a bare u32 verdict (documented mapping in each spike README),
+not the §2.3 78-byte bench journal — wiring `hg-claims` into the guests is a
+proving-tier prerequisite. Cycle-count caveat (both vendors): blst draws random
+blinding scalars via host entropy, so user-cycle counts vary ~10²/run;
+**journal bytes are byte-identical across runs** — §2.4's determinism check
+compares journals, never cycles.
+
 | run_id | date (UTC) | fixture | vendor | stack_id | hw_id | kind (bench / native / control / network) | guest cycles | segments/shards | exec (s) | first proof (s) | succinct (s) | Groth16 wrap (s) | e2e (s) | peak RAM/VRAM | cost USD | proof bytes (succinct / wrapped) | verify gas | journal == golden | evidence | supersedes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| _none yet — M0 not executed_ | | | | | | | | | | | | | | | | | | | | |
+| R-0001 | 2026-07-15 | F-PP1 | RISC Zero | ST-0001 | HW-DEV0 | exec | 197,220,545 user / 207,093,760 total | 198 | 3.32 | — | — | — | — | — | 0 | — | — | n/a·spike (verdict 0 == native) | `evidence/R-0001/` | — |
+| R-0002 | 2026-07-15 | F-PP1 | RISC Zero | ST-0001 | HW-DEV0 | control (tamper) | 1,258,520 user | 2 | 0.04 | — | — | — | — | — | 0 | — | — | n/a·spike (verdict 9 == native) | `evidence/R-0002/` | — |
+| R-0003 | 2026-07-15 | F-PP1 | RISC Zero | ST-0002 | HW-DEV0 | exec | 51,717,002 user / 56,098,816 total | 54 | 1.24 | — | — | — | — | — | 0 | — | — | n/a·spike (verdict 0 == native) | `evidence/R-0003/` | — |
+| R-0004 | 2026-07-15 | F-PP1 | RISC Zero | ST-0002 | HW-DEV0 | control (tamper) | 1,258,520 user | 2 | 0.04 | — | — | — | — | — | 0 | — | — | n/a·spike (verdict 9 == native) | `evidence/R-0004/` | — |
+| R-0005 | 2026-07-15 | F-MN1 | RISC Zero | ST-0001 | HW-DEV0 | exec | 2,533,598,396 user / 2,674,917,376 total | 2,551 | 45.16 | — | — | — | — | — | 0 | — | — | n/a·spike (verdict 0 == native) | `evidence/R-0005/` | — |
+| R-0006 | 2026-07-15 | F-MN1 | RISC Zero | ST-0001 | HW-DEV0 | control (tamper) | 26,082,075 user | 27 | 0.77 | — | — | — | — | — | 0 | — | — | n/a·spike (verdict 9 == native) | `evidence/R-0006/` | — |
+| R-0007 | 2026-07-15 | F-MN1 | RISC Zero | ST-0002 | HW-DEV0 | exec | **930,175,201 user** / 1,011,875,840 total | 965 | 22.63 | — | — | — | — | — | 0 | — | — | n/a·spike (verdict 0 == native) | `evidence/R-0007/` | — |
+| R-0008 | 2026-07-15 | F-MN1 | RISC Zero | ST-0002 | HW-DEV0 | control (tamper) | 26,082,075 user | 27 | 0.88 | — | — | — | — | — | 0 | — | — | n/a·spike (verdict 9 == native) | `evidence/R-0008/` | — |
+| R-SP1-E1 | 2026-07-15 | F-PP1 | SP1 | ST-0003 | HW-DEV0 | exec | 182,937,047 | — | 5.41 | — | — | — | — | — | 0 | — | — | n/a·spike (verdict 0 == native) | `evidence/R-SP1-E1/` | — |
+| R-SP1-E2 | 2026-07-15 | F-PP1 | SP1 | ST-0003 | HW-DEV0 | control (tamper) | 480,102 | — | 0.44 | — | — | — | — | — | 0 | — | — | n/a·spike (verdict 2 == native) | `evidence/R-SP1-E2/` | — |
+| R-SP1-E3 | 2026-07-15 | F-MN1 | SP1 | ST-0003 | HW-DEV0 | exec | **2,374,163,854** | — | 44.87 | — | — | — | — | — | 0 | — | — | n/a·spike (verdict 0 == native) | `evidence/R-SP1-E3/` | — |
+| R-SP1-E4 | 2026-07-15 | F-MN1 | SP1 | ST-0003 | HW-DEV0 | control (tamper) | 8,860,600 | — | 0.44 | — | — | — | — | — | 0 | — | — | n/a·spike (verdict 2 == native) | `evidence/R-SP1-E4/` | — |
+
+Row notes: (1) The tamper controls (§2.4) reject at the **content-hash gate**
+(Sextant `compute_hash` covers `multi_signature` on standard certs), matching
+native exactly — spec-conformant, but the STM-crypto rejection path itself is
+therefore unexercised by this control; a crypto-layer control (mutate a field
+the content hash does not cover, or re-seal the hash) is a proving-tier
+follow-up. (2) The §6.2 acceleration delta on the verify stage: **3.88×**
+(F-PP1) and **2.77×** (F-MN1) user cycles — the backend-independent lottery
+evaluations (Blake2b + num-bigint rational compare) dilute the curve speedup
+at mainnet k=1944. (3) `no-threads` on blst was REQUIRED on both vendors:
+mithril-stm never calls rayon at runtime (doc-comments only — the S-0001/S-0002
+compile-graph worry was an artifact); the real spawner was blst's own
+`da_pool()` threadpool, which panics on both single-threaded guest stds.
+Guest-manifest-only fix; zero Sextant/mithril-stm changes.
 
 ## 8.5 Stage-split sub-ledger (cycles; required on F-MN1 rows)
 
+Instrumentation splits at Sextant API boundaries (read input /
+`Certificate::from_json` / `compute_hash`+integrity / `verify_standard`); the
+lottery-vs-MSM split *inside* `verify_standard` needs mithril-stm-internal
+cycle marks or differential-ELF experiments — a proving-tier follow-up, so
+those two columns are merged under `verify_standard` below.
+
 | run_id | parse + content hash | lottery evaluations | MSM + pairing | other | instrumentation notes |
 |---|---|---|---|---|---|
-| _none yet_ | | | | | |
+| R-0005 | 1,137,529 + 8,244,323 | (merged →) | verify_standard = 2,507,515,790 | read_input = 16,692,605 | risc0 `env::cycle_count()` per stage |
+| R-0007 | 1,137,529 + 8,244,323 | (merged →) | verify_standard = 904,092,623 | read_input = 16,692,605 | risc0 `env::cycle_count()` per stage |
+| R-SP1-E3 | 8,823,919 (parse+hash combined) | (merged →) | verify_standard = 2,365,302,455 | read_input = 363; ~37,117 misc | SP1 cycle-tracker (portable executor + `profiling`; the native child executor drops tracker spans — vendor bug noted in evidence) |
 
 ## 8.6 Spike log (S-…)
 

@@ -30,6 +30,50 @@ mechanism", pure-Rust backend seam required) is narrower than predicted: the
 wall is *only* the missing C cross-compiler, and a stock Debian bare-metal
 RISC-V gcc clears it. mithril-stm's rayon does not block compilation.
 
+## M0 executor extension (2026-07-14)
+
+The guest now carries SP1 `cycle-tracker-report` markers around the three
+stages (`read-input`, `parse-content-hash`, `verify-standard`) and commits the
+documented verdict mapping: `0` accepted, `1` parse error, `2` content-hash
+mismatch, `3` `verify_standard` rejection. `runner/` is the host-side (x86,
+in-container) executor harness: `sp1-sdk`'s `ProverClient::from_env()` +
+`client.execute(elf, stdin)` — execution only, no proving — which reports
+`total_instruction_count` plus the cycle-tracker spans, and differentials the
+guest verdict against native Sextant (`mithril-stm` 0.10.5 + `blst`) computed
+in the same process with the same mapping:
+
+```
+sp1-mithril-runner <elf> <fixture.json> golden|tampered <out-dir>
+```
+
+`tampered` flips one byte inside the `multi_signature` hex value (16 bytes
+past its opening quote, remapped to a different hex digit) — Sextant's
+`compute_hash` covers the `multi_signature` string (mithril.rs:184), so the
+expected journaled rejection is verdict `2`, on guest and native alike.
+Executor evidence: `fixtures/bench/evidence/R-SP1-E{1..4}/`.
+
+### Executor outcome (2026-07-15) — all four rows differential-green
+
+| run | fixture | variant | guest == native | RV64IM instructions | exec wall |
+|---|---|---|---|---|---|
+| R-SP1-E1 | F-PP1 | golden | 0 == 0 | 182,937,047 | 5.4 s |
+| R-SP1-E2 | F-PP1 | tampered @2438 | 2 == 2 | 480,102 | 0.4 s |
+| R-SP1-E3 | F-MN1 | golden | 0 == 0 | 2,374,163,854 | 44.9 s |
+| R-SP1-E4 | F-MN1 | tampered @13724 | 2 == 2 | 8,860,600 | 0.4 s |
+
+Stage split (profiled portable executor; identical instruction totals and
+public values as the native-child executor): F-MN1 golden = read-input 363 /
+parse-content-hash 8,823,919 / verify-standard 2,365,302,455 / other ~37k.
+
+Two runtime walls, both cleared: (1) SP1 v6's native child executor lives in
+`/dev/shm` — Docker's default 64 MB shm SIGBUSes it; the container needs
+`--shm-size` of several GB. (2) blst's Rust bindings build a `threadpool`
+`ThreadPool` inside `verify_standard`; SP1 std's `thread::spawn` returns
+`Unsupported`, so the guest panicked (exit code 1, empty public values) until
+blst's `no-threads` feature was enabled via graph unification. rayon —
+mithril-stm's unconditional dependency — never spawned: 0.10.5 uses rayon in
+doc examples only, so its runtime thread behavior was never exercised.
+
 ## What compiling does NOT establish (M0-proper work)
 
 - **Runs/proves.** Untested here: rayon will try to spawn std threads and

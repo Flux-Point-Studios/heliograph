@@ -1150,6 +1150,7 @@ dependencies = [
 name = "sp1-mithril-guest"
 version = "0.1.0"
 dependencies = [
+ "blst",
  "sextant",
  "sp1-zkvm",
 ]

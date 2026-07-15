@@ -134,17 +134,37 @@ both SP1 and RISC Zero arms until ADR-001 is decided on M0 numbers).
   and F-MN1 (mainnet epoch 643, CardanoTransactions, k=1944, 59 sigs / 1,971
   indices / 244 AVK leaves — chain-median class), verbatim aggregator bytes.
 
-## M0 proper — next
+## M0 — executor phase DONE (2026-07-15; BENCH §8.4 R-0001..R-0008 + R-SP1-E1..E4)
 
-1. **Executor runs** (no §9 gate, no spend): F-PP1 through the RISC Zero
-   executor (`RISC0_DEV_MODE`/r0vm) — first runtime question: does mithril-stm's
-   verify path spawn rayon threads in the single-threaded guest? Differential
-   vs native Sextant + the tamper control; `env::cycle_count` stage split
-   (§8.5). Same for SP1 executor.
+**12/12 rows green: guest verdict == native Sextant on every row, tamper
+controls journal the same rejection as native, both fixtures, both vendors.**
+
+- **The thread question is fully resolved, zero upstream changes:** rayon was
+  never real (doc-comments only in mithril-stm; never called at runtime). The
+  actual spawner was **blst's own `da_pool()` threadpool** — panics on both
+  vendors' single-threaded guest stds; fixed guest-manifest-only with blst
+  `no-threads` (its documented serial path) + risc0 `sys-getenv`.
+- **First-ever STM-verify-in-zkVM cycle numbers** (F-MN1 mainnet, k=1944):
+  RISC Zero accelerated **930.2M** user cycles (vanilla 2,533.6M — the §6.2
+  delta is 2.77× at mainnet scale, diluted by backend-independent lottery
+  math); SP1 unaccelerated gcc-blst 2,374.2M.
+- Cycle counts vary ~10²/run (blst random blinding via host entropy); journal
+  bytes are byte-identical — §2.4 determinism compares journals, never cycles.
+- Tamper rejects at the content-hash gate (native-matching, spec-conformant);
+  a crypto-layer control is a proving-tier follow-up.
+
+## M0 — remaining (proving tier)
+
+1. Wire `hg-claims` into the guests (the §2.3 78-byte bench journal replaces
+   the spike u32) + commit `golden-journal-<fixture>.bin`.
 2. Host-side `cargo risczero build` for the canonical registry image ID +
-   a true two-runner T-A6-1.
-3. GPU proving on the pinned SKU = the first PAID step — **blocked on
-   {{PROVER_BUDGET}}** (§9 gate 4).
+   a true two-runner T-A6-1; close the SP1 `--docker` cross-gcc recipe gap.
+3. Crypto-layer tamper control (mutate below the content hash).
+4. **GPU proving on `g6e.xlarge`** — the threshold-bearing rows. First PAID
+   step: **blocked on {{PROVER_BUDGET}}** (§9 gate 4). Note (estimate, NOT a
+   threshold judgment): at vendor-typical GPU proving throughput, 0.93–2.4B
+   cycles is minutes-scale — the ≤10 min gate looks plausible on the
+   accelerated arm, but only the pinned-SKU measurement decides.
 
 ### Carried obligations (explicit, so they cannot evaporate)
 

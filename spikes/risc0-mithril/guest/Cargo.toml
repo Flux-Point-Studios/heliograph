@@ -23,4 +23,13 @@ mithril = ["sextant/mithril"]
 
 [dependencies]
 risc0-zkvm = { version = "=3.0.5", default-features = false, features = ["std"] }
+# std::thread::Builder::spawn reads RUST_MIN_STACK via std::env::var, and the
+# guest's sys_getenv syscall is feature-gated off by default — without this the
+# mithril-stm verify path panics at runtime (M0 finding; S-0001 was compile-only).
+risc0-zkvm-platform = { version = "=2.2.2", features = ["sys-getenv"] }
+# blst's Rust bindings lazily build their own `threadpool` worker pool at first
+# verify; guest thread spawn is Unsupported and threadpool unwraps it. blst's
+# documented `no-threads` feature (its wasm path) runs the same code serially.
+# Additive via feature unification — mithril-stm's `blst` dep is untouched.
+blst = { version = "0.3.16", features = ["no-threads"] }
 sextant = { git = "https://github.com/Flux-Point-Studios/sextant", rev = "90b2672aa3ee7a957ecaee0e33026337825efafa", default-features = false }

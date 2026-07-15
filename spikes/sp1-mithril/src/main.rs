@@ -1,30 +1,44 @@
-//! S-0002 — SP1 arm of the M0 compile bisect (BENCH.md §6.1, ADR-001).
+//! S-0002 / M0 executor — SP1 arm (BENCH.md §6.1, ADR-001).
 //! Reads Mithril certificate JSON bytes via `sp1_zkvm::io`, verifies on
-//! Sextant's `mithril` path, commits a `u32` verdict. Producing this ELF via
-//! `cargo prove build` is the spike's win condition; the verdict codes matter
-//! only if it does.
+//! Sextant's `mithril` path, commits a `u32` verdict:
+//! 0 = accepted, 1 = parse error, 2 = content-hash mismatch,
+//! 3 = `verify_standard` rejection. Stage boundaries carry SP1
+//! `cycle-tracker-report` markers so the host executor's `ExecutionReport`
+//! yields the BENCH.md §4.2(11) stage split.
 #![no_main]
 sp1_zkvm::entrypoint!(main);
 
 pub fn main() {
+    println!("cycle-tracker-report-start: read-input");
     let bytes = sp1_zkvm::io::read_vec();
+    println!("cycle-tracker-report-end: read-input");
     let verdict = verdict(&bytes);
     sp1_zkvm::io::commit(&verdict);
 }
 
-/// Layer 2: the BENCH.md §2.1 workload minus the journal codec — parse,
+/// The BENCH.md §2.1 workload minus the journal codec — parse,
 /// content-hash recompute, `verify_standard`.
 #[cfg(feature = "mithril")]
 fn verdict(bytes: &[u8]) -> u32 {
     use sextant::mithril::{Certificate, verify_standard};
-    let cert = match Certificate::from_json(bytes) {
+    println!("cycle-tracker-report-start: parse-content-hash");
+    let parsed = Certificate::from_json(bytes);
+    let hash_ok = parsed
+        .as_ref()
+        .map(|cert| cert.compute_hash() == cert.hash)
+        .unwrap_or(false);
+    println!("cycle-tracker-report-end: parse-content-hash");
+    let cert = match parsed {
         Ok(c) => c,
         Err(_) => return 1,
     };
-    if cert.compute_hash() != cert.hash {
+    if !hash_ok {
         return 2;
     }
-    match verify_standard(&cert) {
+    println!("cycle-tracker-report-start: verify-standard");
+    let outcome = verify_standard(&cert);
+    println!("cycle-tracker-report-end: verify-standard");
+    match outcome {
         Ok(()) => 0,
         Err(_) => 3,
     }
